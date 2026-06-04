@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>WATCHTOWER — OFF-GRID</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:ital,wght@0,300;0,400;0,600;0,700;0,800;1,300&display=swap">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      background: #080b12;
+      overflow: hidden;
+      font-family: 'Barlow Condensed', sans-serif;
+      color: #e8ecf4;
+    }
+
+    /* subtle dot-grid texture */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px);
+      background-size: 28px 28px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── TOP BAR ────────────────────────────────────────────────── */
+    #top-bar {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 56px;
+      height: 64px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    #top-left {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    #wt-logo {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 13px;
+      letter-spacing: 5px;
+      color: rgba(255,255,255,0.28);
+      text-transform: uppercase;
+    }
+    #top-divider {
+      width: 1px;
+      height: 20px;
+      background: rgba(255,255,255,0.12);
+    }
+    #trip-label {
+      font-size: 13px;
+      font-weight: 300;
+      letter-spacing: 5px;
+      color: rgba(255,255,255,0.28);
+      text-transform: uppercase;
+    }
+    #top-clock {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 16px;
+      letter-spacing: 3px;
+      color: rgba(255,255,255,0.4);
+    }
+
+    /* ── ACCENT LINE ─────────────────────────────────────────────── */
+    #accent-line {
+      position: relative;
+      z-index: 1;
+      height: 2px;
+      background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(77, 143, 255, 0.0) 10%,
+        rgba(77, 143, 255, 0.6) 40%,
+        rgba(77, 143, 255, 0.6) 60%,
+        rgba(77, 143, 255, 0.0) 90%,
+        transparent 100%
+      );
+    }
+
+    /* ── HERO TEXT ───────────────────────────────────────────────── */
+    #hero {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 38px 0 28px;
+    }
+    #hero-main {
+      font-size: 90px;
+      font-weight: 800;
+      letter-spacing: 18px;
+      text-transform: uppercase;
+      color: #ffffff;
+      line-height: 1;
+      text-shadow: 0 0 60px rgba(77,143,255,0.18);
+    }
+    #hero-sub {
+      margin-top: 18px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      font-size: 22px;
+      font-weight: 300;
+      letter-spacing: 4px;
+      color: rgba(232, 236, 244, 0.55);
+      text-transform: uppercase;
+    }
+    #last-seen-loc {
+      color: rgba(232, 236, 244, 0.85);
+      font-weight: 400;
+    }
+    .hero-dot {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: rgba(77,143,255,0.55);
+      flex-shrink: 0;
+    }
+    #last-seen-age {
+      color: #4d8fff;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 20px;
+      letter-spacing: 2px;
+    }
+
+    /* ── MAP ─────────────────────────────────────────────────────── */
+    #map-section {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      justify-content: center;
+      padding: 0 120px;
+    }
+    #map-frame {
+      width: 100%;
+      height: 530px;
+      border: 1px solid rgba(77,143,255,0.14);
+      outline: 4px solid rgba(77,143,255,0.04);
+      overflow: hidden;
+      position: relative;
+    }
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+    #map .leaflet-control-container,
+    #map .leaflet-attribution-flag { display: none !important; }
+
+    /* corner labels on map */
+    #map-corner {
+      position: absolute;
+      top: 14px;
+      left: 18px;
+      z-index: 1000;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 3px;
+      color: rgba(255,255,255,0.3);
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+
+    /* ── STATS ROW ───────────────────────────────────────────────── */
+    #stats-row {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      height: 72px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      margin-top: 18px;
+    }
+    .stat-cell {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 52px;
+    }
+    .stat-cell + .stat-cell {
+      border-left: 1px solid rgba(255,255,255,0.08);
+    }
+    .stat-icon {
+      width: 40px;
+      height: 40px;
+      filter: brightness(0.8) saturate(0.7);
+    }
+    .stat-val {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 22px;
+      color: rgba(232,236,244,0.85);
+      letter-spacing: 1px;
+    }
+    .stat-label {
+      font-size: 11px;
+      font-weight: 300;
+      letter-spacing: 4px;
+      color: rgba(232,236,244,0.3);
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+    #trip-day-val {
+      font-size: 36px;
+      font-weight: 700;
+      color: rgba(232,236,244,0.9);
+      line-height: 1;
+    }
+    #trip-day-of {
+      font-size: 14px;
+      font-weight: 300;
+      letter-spacing: 3px;
+      color: rgba(232,236,244,0.35);
+      margin-top: 1px;
+    }
+
+    /* ── FOOTER ──────────────────────────────────────────────────── */
+    #footer {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1;
+    }
+    #footer-text {
+      font-size: 11px;
+      font-weight: 300;
+      letter-spacing: 6px;
+      color: rgba(255,255,255,0.14);
+      text-transform: uppercase;
+    }
+
+    /* pulsing position marker */
+    .pulse-wrap {
+      position: relative;
+      width: 18px;
+      height: 18px;
+    }
+    .pulse-core {
+      position: absolute;
+      inset: 3px;
+      border-radius: 50%;
+      background: #4d8fff;
+      border: 2px solid #fff;
+    }
+    .pulse-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 2px solid rgba(77,143,255,0.5);
+      animation: ring-expand 2.2s ease-out infinite;
+    }
+    @keyframes ring-expand {
+      0%   { transform: scale(0.6); opacity: 0.9; }
+      100% { transform: scale(2.6); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top bar -->
+  <div id="top-bar">
+    <div id="top-left">
+      <span id="wt-logo">Watchtower</span>
+      <div id="top-divider"></div>
+      <span id="trip-label" class="trip-name-label">2026 Reset Trip</span>
+    </div>
+    <div id="top-clock">--:-- -- · ---</div>
+  </div>
+
+  <div id="accent-line"></div>
+
+  <!-- Hero -->
+  <div id="hero">
+    <div id="hero-main"><span id="vehicle-name">Serenity</span> is off-grid</div>
+    <div id="hero-sub">
+      <span>Last seen near</span>
+      <div class="hero-dot"></div>
+      <span id="last-seen-loc">---</span>
+      <div class="hero-dot"></div>
+      <span id="last-seen-age">---</span>
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div id="map-section">
+    <div id="map-frame">
+      <div id="map"></div>
+      <div id="map-corner">Route · <span id="map-pts">0</span> pts</div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div id="stats-row">
+    <div class="stat-cell">
+      <img class="stat-icon" id="wx-icon" src="https://openweathermap.org/img/wn/01d@2x.png" alt="">
+      <div>
+        <div class="stat-val"><span id="wx-temp">---</span>°F</div>
+        <div class="stat-label"><span id="wx-desc">---</span></div>
+      </div>
+    </div>
+    <div class="stat-cell">
+      <div>
+        <div id="trip-day-val">—</div>
+        <div id="trip-day-of">--- of ---</div>
+      </div>
+    </div>
+    <div class="stat-cell">
+      <div>
+        <div class="stat-val" id="wx-heading">---</div>
+        <div class="stat-label">Last heading</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div id="footer">
+    <span id="footer-text">WATCHTOWER field relay · <span id="footer-trip"></span></span>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // ── Map ────────────────────────────────────────────────────────────
+    const map = L.map('map', {
+      zoomControl: false, attributionControl: false,
+      dragging: false, touchZoom: false, scrollWheelZoom: false,
+      doubleClickZoom: false, boxZoom: false, keyboard: false,
+    }).setView([39.5, -98.35], 5);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 18, subdomains: 'abcd',
+    }).addTo(map);
+
+    const routeLine = L.polyline([], {
+      color: '#4d8fff', weight: 2.5, opacity: 0.8,
+    }).addTo(map);
+
+    const posIcon = L.divIcon({
+      className: '',
+      html: '<div class="pulse-wrap"><div class="pulse-ring"></div><div class="pulse-core"></div></div>',
+      iconSize: [18, 18], iconAnchor: [9, 9],
+    });
+    const posMarker = L.marker([39.5, -98.35], { icon: posIcon }).addTo(map);
+
+    // ── Helpers ────────────────────────────────────────────────────────
+    function formatAge(s) {
+      if (s === null || s === undefined) return '---';
+      if (s < 60)    return 'just now';
+      if (s < 3600)  return Math.floor(s / 60) + ' min ago';
+      if (s < 86400) { const h = Math.floor(s / 3600); return h + (h === 1 ? ' hr ago' : ' hrs ago'); }
+      const d = Math.floor(s / 86400);
+      return d + (d === 1 ? ' day ago' : ' days ago');
+    }
+
+    // ── Live age counter (ticks every second) ──────────────────────────
+    let currentAge = null;
+    setInterval(() => {
+      if (currentAge !== null) {
+        currentAge++;
+        document.getElementById('last-seen-age').textContent = formatAge(currentAge);
+      }
+    }, 1000);
+
+    // ── State ──────────────────────────────────────────────────────────
+    let mapFitted = false;
+
+    // ── Render ─────────────────────────────────────────────────────────
+    function render(d) {
+      // Vehicle name / trip name (config-driven)
+      document.getElementById('vehicle-name').textContent  = d.vehicle_name || 'Serenity';
+      document.getElementById('trip-label-label')
+        && (document.getElementById('trip-label-label').textContent = d.trip_name || '');
+      document.querySelectorAll('.trip-name-label').forEach(el => {
+        el.textContent = d.trip_name || '2026 Reset Trip';
+      });
+      document.getElementById('footer-trip').textContent = d.trip_name || '2026 Reset Trip';
+
+      // Clock
+      document.getElementById('top-clock').textContent =
+        (d.local_time || '--:-- --') + ' · ' + (d.local_timezone || '---');
+
+      // Last seen
+      document.getElementById('last-seen-loc').textContent = d.city_state || '---';
+      currentAge = d.last_seen_seconds;
+      document.getElementById('last-seen-age').textContent = formatAge(currentAge);
+
+      // Weather
+      if (d.weather_temp_f !== null) {
+        document.getElementById('wx-temp').textContent = d.weather_temp_f;
+        document.getElementById('wx-desc').textContent = d.weather_desc || '---';
+        document.getElementById('wx-icon').src =
+          'https://openweathermap.org/img/wn/' + (d.weather_icon || '01d') + '@2x.png';
+      }
+
+      // Heading
+      document.getElementById('wx-heading').textContent = d.heading || '---';
+
+      // Trip day
+      if (d.trip_day !== null && d.trip_day !== undefined) {
+        document.getElementById('trip-day-val').textContent = 'Day ' + d.trip_day;
+        document.getElementById('trip-day-of').textContent  =
+          d.trip_day + ' of ' + (d.trip_total || '?') + ' days';
+      } else {
+        document.getElementById('trip-day-val').textContent = '—';
+        document.getElementById('trip-day-of').textContent  = d.trip_name || '';
+      }
+
+      // Map
+      if (d.route && d.route.length > 0) {
+        routeLine.setLatLngs(d.route);
+        document.getElementById('map-pts').textContent = d.route.length;
+
+        if (d.lat && d.lon) {
+          posMarker.setLatLng([d.lat, d.lon]);
+        }
+
+        // Fit bounds once, then let it be — only re-fit if route grows significantly
+        if (!mapFitted || d.route.length % 50 === 0) {
+          try {
+            map.fitBounds(routeLine.getBounds(), { padding: [40, 40], maxZoom: 12 });
+            mapFitted = true;
+          } catch (e) { /* single-point edge case */ }
+        }
+      }
+    }
+
+    // ── Poll ───────────────────────────────────────────────────────────
+    async function poll() {
+      try {
+        const r = await fetch('/api/status');
+        if (r.ok) render(await r.json());
+      } catch (e) {
+        console.warn('poll error', e);
+      }
+      setTimeout(poll, 5000);
+    }
+
+    poll();
+  </script>
+</body>
+</html>

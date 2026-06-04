@@ -1,0 +1,7 @@
+flask
+flask-cors
+timezonefinder
+pytz
+requests
+waitress
+python-dotenv

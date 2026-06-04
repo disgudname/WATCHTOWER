@@ -1,0 +1,20 @@
+# credentials — never commit
+.env
+
+# runtime data
+route.db
+watchtower.log
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# editor / OS
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
