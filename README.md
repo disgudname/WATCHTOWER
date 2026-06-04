@@ -20,12 +20,18 @@ Both overlays are 1920×1080. Set OBS browser source size to match.
 
 ## Setup
 
-> One-time. Clone, configure, run the script.
+Two paths depending on what you're doing:
+
+| | `setup.ps1` | `dev.ps1` |
+|---|---|---|
+| **Use for** | Production home machine | Local testing / laptop |
+| **Requires admin** | Yes (Task Scheduler) | No |
+| **Auto-starts on boot** | Yes | No — foreground process, Ctrl+C to stop |
 
 ### Prerequisites
 
 - Python 3.9+ in PATH ([python.org](https://www.python.org/downloads/))
-- Traccar running locally on the same machine
+- Traccar running locally on the same machine (or set `TRACCAR_URL` in `.env` to point elsewhere)
 - A free [OpenWeatherMap](https://openweathermap.org/api) API key
 
 ### Steps
