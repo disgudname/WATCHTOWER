@@ -17,6 +17,7 @@ load_dotenv()
 
 # ── Config ────────────────────────────────────────────────────────────────────
 TRACCAR_URL       = os.getenv("TRACCAR_URL", "http://localhost:8082")
+TRACCAR_TOKEN     = os.getenv("TRACCAR_TOKEN", "")
 TRACCAR_USER      = os.getenv("TRACCAR_USER", "admin")
 TRACCAR_PASS      = os.getenv("TRACCAR_PASS", "")
 TRACCAR_DEVICE_ID = int(os.getenv("TRACCAR_DEVICE_ID", "1"))
@@ -225,10 +226,13 @@ def local_time_at(lat, lon):
 def _traccar_poll():
     while True:
         try:
+            params = {"deviceId": TRACCAR_DEVICE_ID}
+            if TRACCAR_TOKEN:
+                params["token"] = TRACCAR_TOKEN
             r = requests.get(
                 f"{TRACCAR_URL}/api/positions",
-                params={"deviceId": TRACCAR_DEVICE_ID},
-                auth=(TRACCAR_USER, TRACCAR_PASS),
+                params=params,
+                auth=None if TRACCAR_TOKEN else (TRACCAR_USER, TRACCAR_PASS),
                 timeout=5,
             )
             positions = r.json()

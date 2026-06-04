@@ -28,7 +28,7 @@ if (-not (Test-Path $envFile)) {
     Copy-Item (Join-Path $Root "config.example.env") $envFile
     Write-Host ""
     Write-Host "  Created .env from template." -ForegroundColor Yellow
-    Write-Host "  Edit it before continuing — set TRACCAR_URL, TRACCAR_PASS, OPENWEATHERMAP_API_KEY." -ForegroundColor Yellow
+    Write-Host "  Edit it before continuing - set TRACCAR_URL, TRACCAR_PASS, OPENWEATHERMAP_API_KEY." -ForegroundColor Yellow
     Write-Host "  File: $envFile" -ForegroundColor Gray
     Write-Host ""
     Read-Host "  Press Enter when .env is ready"
