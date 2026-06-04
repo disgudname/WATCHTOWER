@@ -154,6 +154,37 @@ WATCHTOWER does **not** handle:
 
 ---
 
+## Spotify Integration
+
+Optional. Shows the currently playing track on both overlays — album art, title, and artist. Hides automatically when nothing is playing.
+
+### Setup (once per machine)
+
+**1. Create a Spotify app**
+- Go to [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard)
+- Create a new app (name doesn't matter)
+- In the app settings, add `http://localhost:8888/callback` as a Redirect URI
+- Copy the Client ID and Client Secret
+
+**2. Add credentials to `.env`**
+```
+SPOTIFY_CLIENT_ID=your_client_id
+SPOTIFY_CLIENT_SECRET=your_client_secret
+```
+
+**3. Authorize**
+```
+venv\Scripts\python auth_spotify.py
+```
+
+A browser window will open. Log in and click Allow. You'll be redirected to a page that won't load — copy the full URL from the address bar and paste it when prompted. Token is saved to `.spotify_cache`.
+
+**4. Restart WATCHTOWER** — it will detect the cache file and start the Spotify poll thread automatically.
+
+> The token doesn't expire unless you revoke it in Spotify's app settings. You need to run `auth_spotify.py` once on your laptop and once on the home server before the trip.
+
+---
+
 ## Staleness
 
 If the GPS fix is more than 30 seconds old:

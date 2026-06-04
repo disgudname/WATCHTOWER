@@ -13,6 +13,13 @@ from flask_cors import CORS
 from timezonefinder import TimezoneFinder
 from dotenv import load_dotenv
 
+try:
+    import spotipy
+    from spotipy.oauth2 import SpotifyOAuth
+    _SPOTIPY_AVAILABLE = True
+except ImportError:
+    _SPOTIPY_AVAILABLE = False
+
 load_dotenv()
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -28,6 +35,10 @@ TRIP_START_DATE   = os.getenv("TRIP_START_DATE", "2026-06-16")
 TRIP_END_DATE     = os.getenv("TRIP_END_DATE", "2026-06-23")
 VEHICLE_NAME      = os.getenv("VEHICLE_NAME", "Serenity")
 TRIP_NAME         = os.getenv("TRIP_NAME", "2026 Reset Trip")
+SPOTIFY_CLIENT_ID     = os.getenv("SPOTIFY_CLIENT_ID", "")
+SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET", "")
+SPOTIFY_REDIRECT_URI  = os.getenv("SPOTIFY_REDIRECT_URI", "http://localhost:8888/callback")
+SPOTIFY_CACHE_PATH    = ".spotify_cache"
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -54,6 +65,7 @@ _state = {
     "trip_day": None, "trip_total": None,
     "vehicle_name": VEHICLE_NAME,
     "trip_name": TRIP_NAME,
+    "now_playing": {"active": False, "title": None, "artist": None, "art_url": None},
 }
 
 tf = TimezoneFinder()
@@ -190,10 +202,13 @@ def get_weather(lat, lon):
             timeout=6,
         )
         d = r.json()
-        _wx_temp = round(d["main"]["temp"])
-        _wx_desc = d["weather"][0]["description"].title()
-        _wx_icon = d["weather"][0]["icon"]
-        _wx_last = time.time()
+        if "main" not in d:
+            log.error("Weather API error: %s", d.get("message", d))
+        else:
+            _wx_temp = round(d["main"]["temp"])
+            _wx_desc = d["weather"][0]["description"].title()
+            _wx_icon = d["weather"][0]["icon"]
+            _wx_last = time.time()
     except Exception as e:
         log.error("Weather: %s", e)
     return _wx_temp, _wx_desc or "---", _wx_icon or "01d"
@@ -222,19 +237,73 @@ def local_time_at(lat, lon):
         log.error("Timezone: %s", e)
     return "--:-- --", "---"
 
+# ── Spotify ───────────────────────────────────────────────────────────────────
+_sp_client = None
+
+def _get_spotify():
+    global _sp_client
+    if not _SPOTIPY_AVAILABLE:
+        return None
+    if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
+        return None
+    if not os.path.exists(SPOTIFY_CACHE_PATH):
+        return None
+    if _sp_client is None:
+        try:
+            auth = SpotifyOAuth(
+                client_id=SPOTIFY_CLIENT_ID,
+                client_secret=SPOTIFY_CLIENT_SECRET,
+                redirect_uri=SPOTIFY_REDIRECT_URI,
+                scope="user-read-currently-playing user-read-playback-state",
+                cache_path=SPOTIFY_CACHE_PATH,
+                open_browser=False,
+            )
+            _sp_client = spotipy.Spotify(auth_manager=auth)
+        except Exception as e:
+            log.error("Spotify init: %s", e)
+    return _sp_client
+
+def _spotify_poll():
+    while True:
+        sp = _get_spotify()
+        if sp:
+            try:
+                result = sp.current_playback()
+                if result and result.get("is_playing") and result.get("item"):
+                    track  = result["item"]
+                    images = track["album"]["images"]
+                    now_playing = {
+                        "active":   True,
+                        "title":    track["name"],
+                        "artist":   ", ".join(a["name"] for a in track["artists"]),
+                        "art_url":  images[0]["url"] if images else None,
+                    }
+                else:
+                    now_playing = {"active": False}
+                with _lock:
+                    _state["now_playing"] = now_playing
+            except Exception as e:
+                log.error("Spotify poll: %s", e)
+        time.sleep(15)
+
 # ── Traccar poll thread ───────────────────────────────────────────────────────
 def _traccar_poll():
     while True:
         try:
-            params = {"deviceId": TRACCAR_DEVICE_ID}
-            if TRACCAR_TOKEN:
-                params["token"] = TRACCAR_TOKEN
+            headers = {"Authorization": f"Bearer {TRACCAR_TOKEN}"} if TRACCAR_TOKEN else {}
             r = requests.get(
                 f"{TRACCAR_URL}/api/positions",
-                params=params,
+                params={"deviceId": TRACCAR_DEVICE_ID},
+                headers=headers,
                 auth=None if TRACCAR_TOKEN else (TRACCAR_USER, TRACCAR_PASS),
                 timeout=5,
             )
+            if r.status_code != 200:
+                log.error("Traccar returned HTTP %d: %s", r.status_code, r.text[:200])
+                with _lock:
+                    _state["stale"] = True
+                time.sleep(5)
+                continue
             positions = r.json()
             if positions:
                 pos      = positions[0]
@@ -318,6 +387,12 @@ if __name__ == "__main__":
 
     threading.Thread(target=_traccar_poll, daemon=True).start()
     log.info("Traccar poll thread started")
+
+    if _SPOTIPY_AVAILABLE and SPOTIFY_CLIENT_ID and os.path.exists(SPOTIFY_CACHE_PATH):
+        threading.Thread(target=_spotify_poll, daemon=True).start()
+        log.info("Spotify poll thread started")
+    else:
+        log.info("Spotify not configured — skipping (run auth_spotify.py to enable)")
 
     try:
         from waitress import serve

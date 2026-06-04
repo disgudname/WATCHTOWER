@@ -177,6 +177,52 @@
       text-transform: uppercase;
     }
 
+    /* ── NOW PLAYING  top-left ───────────────────────────────── */
+    #now-playing {
+      top: 44px;
+      left: 44px;
+      display: none;
+      align-items: center;
+      gap: 14px;
+      padding: 10px 16px 10px 10px;
+      max-width: 340px;
+    }
+    #now-playing.active { display: flex; }
+    #np-art {
+      width: 54px;
+      height: 54px;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+    #np-text { overflow: hidden; }
+    #np-label {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 11px;
+      font-weight: 300;
+      letter-spacing: 5px;
+      color: #f0a500;
+      text-transform: uppercase;
+      margin-bottom: 3px;
+    }
+    #np-title {
+      font-size: 15px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #fff;
+    }
+    #np-artist {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 13px;
+      font-weight: 300;
+      letter-spacing: 2px;
+      color: rgba(255,255,255,0.5);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     /* ── STALE / SIGNAL LOST badge  top-left ─────────────────── */
     #stale-badge {
       top: 44px;
@@ -249,6 +295,16 @@
     <span id="loc-val">---</span>
   </div>
 
+  <!-- Now playing -->
+  <div id="now-playing" class="panel">
+    <img id="np-art" src="" alt="">
+    <div id="np-text">
+      <div id="np-label">&#9654; Now Playing</div>
+      <div id="np-title"></div>
+      <div id="np-artist"></div>
+    </div>
+  </div>
+
   <!-- Stale badge -->
   <div id="stale-badge" class="panel">&#9888; Signal Lost</div>
 
@@ -313,6 +369,18 @@
 
       // Stale badge
       document.getElementById('stale-badge').classList.toggle('show', !!stale);
+
+      // Now playing — only show when not stale (stale badge occupies same corner)
+      const np = d.now_playing;
+      const npEl = document.getElementById('now-playing');
+      if (!stale && np && np.active) {
+        document.getElementById('np-title').textContent  = np.title  || '';
+        document.getElementById('np-artist').textContent = np.artist || '';
+        if (np.art_url) document.getElementById('np-art').src = np.art_url;
+        npEl.classList.add('active');
+      } else {
+        npEl.classList.remove('active');
+      }
 
       // Map — only pan when position actually changes
       if (d.lat && d.lon) {

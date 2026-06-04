@@ -2,6 +2,8 @@ flask
 flask-cors
 timezonefinder
 pytz
+tzdata
 requests
 waitress
 python-dotenv
+spotipy

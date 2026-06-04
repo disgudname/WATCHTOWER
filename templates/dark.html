@@ -324,6 +324,14 @@
         <div class="stat-label">Last heading</div>
       </div>
     </div>
+    <div class="stat-cell" id="np-cell" style="display:none">
+      <img id="np-art" style="width:44px;height:44px;object-fit:cover;flex-shrink:0;" src="" alt="">
+      <div style="overflow:hidden;max-width:320px;">
+        <div style="font-size:11px;font-weight:300;letter-spacing:5px;color:rgba(232,236,244,0.35);text-transform:uppercase;margin-bottom:3px;">&#9654; Now Playing</div>
+        <div id="np-title" style="font-family:'Share Tech Mono',monospace;font-size:16px;color:rgba(232,236,244,0.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+        <div id="np-artist" style="font-size:14px;font-weight:300;letter-spacing:2px;color:rgba(232,236,244,0.4);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+      </div>
+    </div>
   </div>
 
   <!-- Footer -->
@@ -407,6 +415,18 @@
 
       // Heading
       document.getElementById('wx-heading').textContent = d.heading || '---';
+
+      // Now playing
+      const np = d.now_playing;
+      const npCell = document.getElementById('np-cell');
+      if (np && np.active) {
+        document.getElementById('np-title').textContent  = np.title  || '';
+        document.getElementById('np-artist').textContent = np.artist || '';
+        if (np.art_url) document.getElementById('np-art').src = np.art_url;
+        npCell.style.display = 'flex';
+      } else {
+        npCell.style.display = 'none';
+      }
 
       // Trip day
       if (d.trip_day !== null && d.trip_day !== undefined) {
