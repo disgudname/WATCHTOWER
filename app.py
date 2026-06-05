@@ -374,7 +374,7 @@ def _traccar_poll():
                 pos       = positions[0]
                 lat       = pos["latitude"]
                 lon       = pos["longitude"]
-                speed_mph = pos.get("speed", 0) * 0.621371
+                speed_mph = pos.get("speed", 0) * 1.15078
                 heading   = to_cardinal(pos.get("course"))
                 fix_time  = pos.get("fixTime", "")
                 elevation_ft = round(pos.get("altitude", 0) * 3.28084)
@@ -443,7 +443,7 @@ def _traccar_poll():
             with _lock:
                 _state["stale"] = True
 
-        time.sleep(5)
+        time.sleep(3)
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 @app.route("/pdm.png")
