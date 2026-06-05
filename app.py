@@ -23,7 +23,7 @@ except ImportError:
 load_dotenv()
 
 # ── Config ────────────────────────────────────────────────────────────────────
-TRACCAR_URL       = os.getenv("TRACCAR_URL", "http://localhost:8082")
+TRACCAR_URL       = os.getenv("TRACCAR_URL", "http://localhost:8082").rstrip("/")
 TRACCAR_TOKEN     = os.getenv("TRACCAR_TOKEN", "")
 TRACCAR_USER      = os.getenv("TRACCAR_USER", "admin")
 TRACCAR_PASS      = os.getenv("TRACCAR_PASS", "")
