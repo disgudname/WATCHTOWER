@@ -23,11 +23,12 @@ except ImportError:
 load_dotenv()
 
 # ── Config ────────────────────────────────────────────────────────────────────
-TRACCAR_URL       = os.getenv("TRACCAR_URL", "http://localhost:8082").rstrip("/")
-TRACCAR_TOKEN     = os.getenv("TRACCAR_TOKEN", "")
-TRACCAR_USER      = os.getenv("TRACCAR_USER", "admin")
-TRACCAR_PASS      = os.getenv("TRACCAR_PASS", "")
-TRACCAR_DEVICE_ID = int(os.getenv("TRACCAR_DEVICE_ID", "1"))
+TRACCAR_URL        = os.getenv("TRACCAR_URL", "http://localhost:8082").rstrip("/")
+TRACCAR_TOKEN      = os.getenv("TRACCAR_TOKEN", "")
+TRACCAR_USER       = os.getenv("TRACCAR_USER", "admin")
+TRACCAR_PASS       = os.getenv("TRACCAR_PASS", "")
+TRACCAR_DEVICE_ID  = int(os.getenv("TRACCAR_DEVICE_ID", "1"))
+TRACCAR_SSL_VERIFY = os.getenv("TRACCAR_SSL_VERIFY", "true").lower() not in ("false", "0", "no")
 OWM_KEY           = os.getenv("OPENWEATHERMAP_API_KEY", "")
 FLASK_PORT        = int(os.getenv("FLASK_PORT", "5000"))
 DB_PATH           = os.getenv("DB_PATH", "route.db")
@@ -339,6 +340,7 @@ def _traccar_poll():
                 headers=headers,
                 auth=None if TRACCAR_TOKEN else (TRACCAR_USER, TRACCAR_PASS),
                 timeout=5,
+                verify=TRACCAR_SSL_VERIFY,
             )
             if r.status_code != 200:
                 log.error("Traccar returned HTTP %d: %s", r.status_code, r.text[:200])
@@ -357,6 +359,7 @@ def _traccar_poll():
                     headers=headers,
                     auth=None if TRACCAR_TOKEN else (TRACCAR_USER, TRACCAR_PASS),
                     timeout=5,
+                    verify=TRACCAR_SSL_VERIFY,
                 )
                 if dr.status_code == 200:
                     devices = dr.json()
