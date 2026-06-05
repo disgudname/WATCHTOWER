@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>WATCHTOWER — MOBILE</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;800&display=swap">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      background: transparent;
+      overflow: hidden;
+      font-family: 'Share Tech Mono', monospace;
+      color: #e8ecf4;
+    }
+
+    /* 9:16 video at 1080px tall = 607.5px wide, centered
+       Each panel: (1920 - 608) / 2 = 656px                  */
+
+    /* ── SIDE PANELS ─────────────────────────────────────────── */
+    #left-panel {
+      position: absolute;
+      left: 0; top: 0;
+      width: 656px;
+      height: 1080px;
+      background: rgba(6, 8, 14, 0.85);
+      border-right: 1px solid rgba(240, 165, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+    }
+    #right-panel {
+      position: absolute;
+      right: 0; top: 0;
+      width: 656px;
+      height: 1080px;
+      background: rgba(6, 8, 14, 0.85);
+      border-left: 1px solid rgba(240, 165, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── LEFT: HEADER ────────────────────────────────────────── */
+    #mob-header {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 0 28px;
+      height: 60px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    #mob-logo {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 5px;
+      color: #fff;
+      text-transform: uppercase;
+    }
+    #mob-header-div {
+      width: 1px;
+      height: 16px;
+      background: rgba(255,255,255,0.15);
+    }
+    #mob-trip {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 5px;
+      color: #fff;
+      text-transform: uppercase;
+    }
+
+    /* ── LEFT: CLOCK ─────────────────────────────────────────── */
+    #mob-clock-wrap {
+      flex-shrink: 0;
+      padding: 26px 28px 22px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    #mob-time {
+      font-size: 80px;
+      line-height: 1;
+      letter-spacing: 2px;
+      color: #fff;
+    }
+    #mob-tz {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 7px;
+      color: #fff;
+      text-transform: uppercase;
+      margin-top: 6px;
+    }
+    #mob-colon {
+      animation: colon-blink 1s step-start infinite;
+    }
+    @keyframes colon-blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0; }
+    }
+
+    /* ── LEFT: LOCATION ──────────────────────────────────────── */
+    #mob-loc-wrap {
+      flex-shrink: 0;
+      padding: 20px 28px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    #mob-loc-label {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 5px;
+      color: #fff;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    #mob-loc-val {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 44px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: #fff;
+      text-transform: uppercase;
+      line-height: 1.1;
+    }
+
+    /* ── LEFT: MAP (fills remaining height) ──────────────────── */
+    #mob-map-wrap {
+      flex: 1;
+      min-height: 0;
+    }
+    #mob-map {
+      width: 100%;
+      height: 100%;
+    }
+    #mob-map .leaflet-control-container,
+    #mob-map .leaflet-attribution-flag { display: none !important; }
+
+    /* ── RIGHT: WEATHER HERO ─────────────────────────────────── */
+    #mob-wx-wrap {
+      flex-shrink: 0;
+      padding: 28px 28px 22px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    #mob-wx-top {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    #mob-wx-icon {
+      width: 72px;
+      height: 72px;
+      filter: brightness(1.1) saturate(0.9);
+      flex-shrink: 0;
+    }
+    #mob-wx-temp {
+      font-size: 96px;
+      line-height: 1;
+      letter-spacing: -4px;
+      color: #fff;
+    }
+    #mob-wx-desc {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 20px;
+      letter-spacing: 2px;
+      color: #fff;
+      text-transform: uppercase;
+      margin-top: 10px;
+    }
+
+    /* ── RIGHT: STATS ROW ────────────────────────────────────── */
+    #mob-stats {
+      flex-shrink: 0;
+      display: flex;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .mob-stat {
+      flex: 1;
+      padding: 18px 22px;
+    }
+    .mob-stat + .mob-stat {
+      border-left: 1px solid rgba(255,255,255,0.07);
+    }
+    .mob-stat-label {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 5px;
+      color: #fff;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+    .mob-stat-val {
+      font-size: 26px;
+      letter-spacing: 1px;
+      color: #fff;
+    }
+
+    /* ── RIGHT: NOW PLAYING ──────────────────────────────────── */
+    #mob-np {
+      flex-shrink: 0;
+      padding: 20px 28px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      display: none;
+    }
+    #mob-np.active { display: block; }
+    #mob-np-label {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 5px;
+      color: #fff;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    #mob-np-inner {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    #mob-np-art {
+      width: 72px;
+      height: 72px;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+    #mob-np-text { overflow: hidden; }
+    #mob-np-title {
+      font-size: 20px;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #mob-np-artist {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 15px;
+      color: #fff;
+      margin-top: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ── RIGHT: GPS SIGNAL LOST ──────────────────────────────── */
+    #mob-stale {
+      position: absolute;
+      bottom: 28px;
+      left: 28px;
+      padding: 10px 20px;
+      background: rgba(180, 20, 20, 0.88);
+      border: 1px solid rgba(220, 60, 60, 0.6);
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 5px;
+      color: #fff;
+      text-transform: uppercase;
+      display: none;
+      animation: stale-pulse 2.4s ease-in-out infinite;
+    }
+    #mob-stale.show { display: block; }
+    @keyframes stale-pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.45; }
+    }
+
+    /* ── STATE CROSSING BANNER ───────────────────────────────── */
+    #state-banner {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 1s ease;
+      z-index: 20;
+    }
+    #state-banner.show { opacity: 1; }
+    #state-banner-label {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 20px;
+      font-weight: 300;
+      letter-spacing: 10px;
+      color: #fff;
+      text-transform: uppercase;
+    }
+    #state-banner-name {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 80px;
+      font-weight: 800;
+      letter-spacing: 14px;
+      color: #fff;
+      text-transform: uppercase;
+      line-height: 1;
+      text-shadow: 0 0 80px rgba(240,165,0,0.35);
+    }
+
+    /* ── MAP MARKER ──────────────────────────────────────────── */
+    .mob-pulse-wrap {
+      position: relative;
+      width: 18px;
+      height: 18px;
+    }
+    .mob-pulse-core {
+      position: absolute;
+      inset: 3px;
+      border-radius: 50%;
+      background: #f0a500;
+      border: 2px solid #fff;
+    }
+    .mob-pulse-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 2px solid rgba(240, 165, 0, 0.55);
+      animation: ring-expand 2.2s ease-out infinite;
+    }
+    @keyframes ring-expand {
+      0%   { transform: scale(0.6); opacity: 0.9; }
+      100% { transform: scale(2.6); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Left panel -->
+  <div id="left-panel">
+    <div id="mob-header">
+      <span id="mob-logo">Watchtower</span>
+      <div id="mob-header-div"></div>
+      <span id="mob-trip" class="trip-name-label">2026 Reset Trip</span>
+    </div>
+    <div id="mob-clock-wrap">
+      <div id="mob-time">--:-- --</div>
+      <div id="mob-tz">---</div>
+    </div>
+    <div id="mob-loc-wrap">
+      <div id="mob-loc-label">Current location</div>
+      <div id="mob-loc-val">---</div>
+    </div>
+    <div id="mob-map-wrap">
+      <div id="mob-map"></div>
+    </div>
+  </div>
+
+  <!-- Right panel -->
+  <div id="right-panel">
+    <div id="mob-wx-wrap">
+      <div id="mob-wx-top">
+        <img id="mob-wx-icon" src="https://openweathermap.org/img/wn/01d@2x.png" alt="">
+        <div id="mob-wx-temp">--°F</div>
+      </div>
+      <div id="mob-wx-desc">---</div>
+    </div>
+    <div id="mob-stats">
+      <div class="mob-stat">
+        <div class="mob-stat-label">Elevation</div>
+        <div class="mob-stat-val" id="mob-elev-val">--- ft MSL</div>
+      </div>
+      <div class="mob-stat">
+        <div class="mob-stat-label">Trip day</div>
+        <div class="mob-stat-val" id="mob-day-val">—</div>
+      </div>
+    </div>
+    <div id="mob-np">
+      <div id="mob-np-label">&#9654; Now Playing</div>
+      <div id="mob-np-inner">
+        <img id="mob-np-art" src="" alt="">
+        <div id="mob-np-text">
+          <div id="mob-np-title"></div>
+          <div id="mob-np-artist"></div>
+        </div>
+      </div>
+    </div>
+    <div id="mob-stale">&#9888; GPS Signal Lost</div>
+  </div>
+
+  <!-- State crossing banner (centered over the video) -->
+  <div id="state-banner">
+    <div id="state-banner-label">Now entering</div>
+    <div id="state-banner-name"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // ── Map ──────────────────────────────────────────────────────────────────
+    const map = L.map('mob-map', {
+      zoomControl: false, attributionControl: false,
+      dragging: false, touchZoom: false, scrollWheelZoom: false,
+      doubleClickZoom: false, boxZoom: false, keyboard: false,
+    }).setView([39.5, -98.35], 16);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19, subdomains: 'abcd',
+    }).addTo(map);
+
+    const routeLine = L.polyline([], {
+      color: '#f0a500', weight: 3, opacity: 0.8,
+    }).addTo(map);
+
+    const posIcon = L.divIcon({
+      className: '',
+      html: '<div class="mob-pulse-wrap"><div class="mob-pulse-ring"></div><div class="mob-pulse-core"></div></div>',
+      iconSize: [18, 18], iconAnchor: [9, 9],
+    });
+    const posMarker = L.marker([39.5, -98.35], { icon: posIcon }).addTo(map);
+
+    // invalidate after flex layout settles
+    setTimeout(() => map.invalidateSize(), 150);
+
+    // ── State ────────────────────────────────────────────────────────────────
+    let lastLat = null, lastLon = null;
+    let lastCrossingAt = null;
+
+    function showStateBanner(name) {
+      const el = document.getElementById('state-banner');
+      document.getElementById('state-banner-name').textContent = name.toUpperCase();
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 9000);
+    }
+
+    // ── Render ───────────────────────────────────────────────────────────────
+    function render(d) {
+      // Trip name
+      document.querySelectorAll('.trip-name-label').forEach(el => {
+        el.textContent = d.trip_name || '2026 Reset Trip';
+      });
+
+      // Clock
+      const timeStr = d.local_time || '--:-- --';
+      const colonIdx = timeStr.indexOf(':');
+      document.getElementById('mob-time').innerHTML = colonIdx >= 0
+        ? timeStr.slice(0, colonIdx) + '<span id="mob-colon">:</span>' + timeStr.slice(colonIdx + 1)
+        : timeStr;
+      document.getElementById('mob-tz').textContent = d.local_timezone || '---';
+
+      // Location
+      document.getElementById('mob-loc-val').textContent =
+        (d.city_state || '---').toUpperCase();
+
+      // Weather
+      if (d.weather_temp_f !== null) {
+        document.getElementById('mob-wx-temp').textContent = d.weather_temp_f + '°F';
+        document.getElementById('mob-wx-desc').textContent = (d.weather_desc || '---').toUpperCase();
+        document.getElementById('mob-wx-icon').src =
+          'https://openweathermap.org/img/wn/' + (d.weather_icon || '01d') + '@2x.png';
+      }
+
+      // Elevation
+      document.getElementById('mob-elev-val').textContent =
+        d.elevation_ft !== null ? d.elevation_ft.toLocaleString() + ' ft MSL' : '--- ft MSL';
+
+      // Trip day
+      document.getElementById('mob-day-val').textContent =
+        (d.trip_day !== null && d.trip_day !== undefined) ? 'Day ' + d.trip_day : '—';
+
+      // Stale
+      document.getElementById('mob-stale').classList.toggle('show', !!d.stale);
+
+      // State crossing
+      const sc = d.state_crossing;
+      if (sc && sc.at && sc.at !== lastCrossingAt) {
+        if (Date.now() / 1000 - sc.at < 15) {
+          lastCrossingAt = sc.at;
+          showStateBanner(sc.name);
+        }
+      }
+
+      // Now playing
+      const np = d.now_playing;
+      const npEl = document.getElementById('mob-np');
+      if (np && np.active) {
+        document.getElementById('mob-np-title').textContent  = np.title  || '';
+        document.getElementById('mob-np-artist').textContent = np.artist || '';
+        if (np.art_url) document.getElementById('mob-np-art').src = np.art_url;
+        npEl.classList.add('active');
+      } else {
+        npEl.classList.remove('active');
+      }
+
+      // Map
+      if (d.lat && d.lon) {
+        if (d.lat !== lastLat || d.lon !== lastLon) {
+          posMarker.setLatLng([d.lat, d.lon]);
+          map.panTo([d.lat, d.lon], { animate: true, duration: 1 });
+          lastLat = d.lat; lastLon = d.lon;
+        }
+        if (d.route && d.route.length > 0) {
+          routeLine.setLatLngs(d.route.slice(-200));
+        }
+      }
+    }
+
+    // ── Poll ─────────────────────────────────────────────────────────────────
+    async function poll() {
+      try {
+        const r = await fetch('/api/status');
+        if (r.ok) render(await r.json());
+      } catch (e) {
+        console.warn('poll error', e);
+        document.getElementById('mob-stale').classList.add('show');
+      }
+      setTimeout(poll, 5000);
+    }
+
+    poll();
+  </script>
+</body>
+</html>

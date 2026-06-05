@@ -2,7 +2,7 @@
 WATCHTOWER — one-time Spotify authorization.
 
 Run this once on each machine before the trip:
-    venv\Scripts\python auth_spotify.py
+    venv\\Scripts\\python auth_spotify.py
 
 What it does:
   1. Opens a browser to Spotify's login page
@@ -56,8 +56,10 @@ print("  WATCHTOWER - Spotify Authorization")
 print("  ------------------------------------")
 print("  Opening Spotify in your browser...")
 print("  Log in and click Allow.")
-print("  You'll land on a page that won't load. That's fine.")
-print("  Copy the full URL from the address bar and paste it below.")
+print("  After clicking Allow, your browser will land on a page that")
+print("  won't load (127.0.0.1:8888). That's expected.")
+print("  Copy the full URL from the address bar at THAT point.")
+print("  It will start with: http://127.0.0.1:8888/callback?code=...")
 print()
 
 webbrowser.open(auth_url)

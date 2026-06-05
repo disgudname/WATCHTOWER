@@ -8,7 +8,7 @@ from datetime import datetime, timezone, date
 from zoneinfo import ZoneInfo
 
 import requests
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, send_from_directory
 from flask_cors import CORS
 from timezonefinder import TimezoneFinder
 from dotenv import load_dotenv
@@ -66,7 +66,15 @@ _state = {
     "vehicle_name": VEHICLE_NAME,
     "trip_name": TRIP_NAME,
     "now_playing": {"active": False, "title": None, "artist": None, "art_url": None},
+    "elevation_ft": None,
+    "odometer_miles": 0.0,
+    "state_crossing": None,
 }
+
+# odometer and state-crossing tracking (poll thread only — no lock needed)
+_odo_last_lat  = None
+_odo_last_lon  = None
+_prev_state_abbr = None
 
 tf = TimezoneFinder()
 app = Flask(__name__)
@@ -110,8 +118,39 @@ def db_load_route():
         log.error("DB read: %s", e)
         return []
 
+def db_compute_odometer():
+    """Recompute trip odometer from DB, filtering out GPS drift when stationary."""
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            rows = conn.execute(
+                "SELECT lat, lon, speed_mph FROM positions ORDER BY timestamp"
+            ).fetchall()
+        total = 0.0
+        prev_lat = prev_lon = None
+        for lat, lon, speed in rows:
+            if prev_lat is not None and speed is not None and speed >= MIN_MOVE_MPH:
+                total += haversine_mi(prev_lat, prev_lon, lat, lon)
+            prev_lat, prev_lon = lat, lon
+        return round(total, 1)
+    except Exception as e:
+        log.error("Odometer DB compute: %s", e)
+        return 0.0
+
+def db_last_position():
+    """Return (lat, lon) of the most recent stored position, or (None, None)."""
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            row = conn.execute(
+                "SELECT lat, lon FROM positions ORDER BY timestamp DESC LIMIT 1"
+            ).fetchone()
+        return (row[0], row[1]) if row else (None, None)
+    except Exception:
+        return (None, None)
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 _CARDINALS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+
+MIN_MOVE_MPH = 3.0
 
 _STATE_ABBR = {
     "Alabama": "AL", "Alaska": "AK", "Arizona": "AZ", "Arkansas": "AR",
@@ -128,6 +167,7 @@ _STATE_ABBR = {
     "Vermont": "VT", "Virginia": "VA", "Washington": "WA", "West Virginia": "WV",
     "Wisconsin": "WI", "Wyoming": "WY", "District of Columbia": "DC",
 }
+_ABBR_TO_STATE = {v: k for k, v in _STATE_ABBR.items()}
 
 def to_cardinal(deg):
     if deg is None:
@@ -148,6 +188,8 @@ def trip_day_of():
         end   = date.fromisoformat(TRIP_END_DATE)
         today = date.today()
         total = (end - start).days + 1
+        if today < start:
+            return (today - start).days, total   # negative: days until departure
         if start <= today <= end:
             return (today - start).days + 1, total
     except Exception:
@@ -305,13 +347,34 @@ def _traccar_poll():
                 time.sleep(5)
                 continue
             positions = r.json()
+
+            # Device online/offline status
+            stale = True
+            try:
+                dr = requests.get(
+                    f"{TRACCAR_URL}/api/devices",
+                    params={"id": TRACCAR_DEVICE_ID},
+                    headers=headers,
+                    auth=None if TRACCAR_TOKEN else (TRACCAR_USER, TRACCAR_PASS),
+                    timeout=5,
+                )
+                if dr.status_code == 200:
+                    devices = dr.json()
+                    if devices:
+                        stale = devices[0].get("status", "offline") != "online"
+            except Exception as e:
+                log.error("Traccar device status: %s", e)
+
             if positions:
-                pos      = positions[0]
-                lat      = pos["latitude"]
-                lon      = pos["longitude"]
+                global _odo_last_lat, _odo_last_lon, _prev_state_abbr
+
+                pos       = positions[0]
+                lat       = pos["latitude"]
+                lon       = pos["longitude"]
                 speed_mph = pos.get("speed", 0) * 0.621371
-                heading  = to_cardinal(pos.get("course"))
-                fix_time = pos.get("fixTime", "")
+                heading   = to_cardinal(pos.get("course"))
+                fix_time  = pos.get("fixTime", "")
+                elevation_ft = round(pos.get("altitude", 0) * 3.28084)
 
                 local_time, local_tz = local_time_at(lat, lon)
                 wx_temp, wx_desc, wx_icon = get_weather(lat, lon)
@@ -324,12 +387,32 @@ def _traccar_poll():
                 except Exception:
                     age_sec = 9999
 
+                # Odometer — only accumulate when actually moving (Doppler speed filter
+                # prevents GPS drift while parked from adding phantom miles)
+                odo_delta = 0.0
+                if _odo_last_lat is not None and speed_mph >= MIN_MOVE_MPH:
+                    odo_delta = haversine_mi(_odo_last_lat, _odo_last_lon, lat, lon)
+                _odo_last_lat, _odo_last_lon = lat, lon
+
+                # State crossing detection
+                state_abbr = city_state.split(", ")[-1] if ", " in city_state else ""
+                crossing = None
+                if state_abbr and _prev_state_abbr is not None and state_abbr != _prev_state_abbr:
+                    crossing = {
+                        "abbr": state_abbr,
+                        "name": _ABBR_TO_STATE.get(state_abbr, state_abbr),
+                        "at": time.time(),
+                    }
+                    log.info("State crossing: %s → %s", _prev_state_abbr, state_abbr)
+                if state_abbr:
+                    _prev_state_abbr = state_abbr
+
                 point = [round(lat, 5), round(lon, 5)]
 
                 with _lock:
                     if not _state["route"] or _state["route"][-1] != point:
                         _state["route"].append(point)
-                    _state.update({
+                    updates = {
                         "lat": lat, "lon": lon,
                         "speed_mph": round(speed_mph, 1),
                         "heading": heading,
@@ -340,10 +423,15 @@ def _traccar_poll():
                         "weather_temp_f": wx_temp,
                         "weather_desc": wx_desc,
                         "weather_icon": wx_icon,
-                        "stale": age_sec > 30,
+                        "stale": stale,
                         "trip_day": trip_day,
                         "trip_total": trip_total,
-                    })
+                        "elevation_ft": elevation_ft,
+                        "odometer_miles": round(_state["odometer_miles"] + odo_delta, 1),
+                    }
+                    if crossing:
+                        updates["state_crossing"] = crossing
+                    _state.update(updates)
 
                 db_save(fix_time, lat, lon, speed_mph, pos.get("course"), city_state)
 
@@ -355,10 +443,28 @@ def _traccar_poll():
         time.sleep(5)
 
 # ── Routes ────────────────────────────────────────────────────────────────────
+@app.route("/pdm.png")
+def pdm_art():
+    return send_from_directory(".", "pdm.png")
+
 @app.route("/api/status")
 def api_status():
     with _lock:
         return jsonify(dict(_state))
+
+@app.route("/api/tips")
+def api_tips():
+    tips_path = os.path.join(os.path.dirname(__file__), "tips.txt")
+    tips = []
+    try:
+        with open(tips_path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("TIP|"):
+                    tips.append(line[4:])
+    except FileNotFoundError:
+        pass
+    return jsonify(tips)
 
 @app.route("/live")
 def live():
@@ -368,12 +474,16 @@ def live():
 def dark():
     return render_template("dark.html")
 
+@app.route("/mobile")
+def mobile():
+    return render_template("mobile.html")
+
 @app.route("/")
 def index():
     return (
         "<h2>WATCHTOWER</h2>"
         "<a href='/live'>/live</a> &nbsp; <a href='/dark'>/dark</a> &nbsp; "
-        "<a href='/api/status'>/api/status</a>"
+        "<a href='/mobile'>/mobile</a> &nbsp; <a href='/api/status'>/api/status</a>"
     )
 
 # ── Entry point ───────────────────────────────────────────────────────────────
@@ -381,9 +491,14 @@ if __name__ == "__main__":
     init_db()
 
     history = db_load_route()
+    odo = db_compute_odometer()
+    last_lat, last_lon = db_last_position()
     with _lock:
         _state["route"] = history
-    log.info("Loaded %d route points from DB", len(history))
+        _state["odometer_miles"] = odo
+    if last_lat is not None:
+        _odo_last_lat, _odo_last_lon = last_lat, last_lon
+    log.info("Loaded %d route points from DB, odometer %.1f mi", len(history), odo)
 
     threading.Thread(target=_traccar_poll, daemon=True).start()
     log.info("Traccar poll thread started")

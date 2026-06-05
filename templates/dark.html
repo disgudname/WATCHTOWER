@@ -49,7 +49,7 @@
       font-family: 'Share Tech Mono', monospace;
       font-size: 13px;
       letter-spacing: 5px;
-      color: rgba(255,255,255,0.28);
+      color: #fff;
       text-transform: uppercase;
     }
     #top-divider {
@@ -61,14 +61,14 @@
       font-size: 13px;
       font-weight: 300;
       letter-spacing: 5px;
-      color: rgba(255,255,255,0.28);
+      color: #fff;
       text-transform: uppercase;
     }
     #top-clock {
       font-family: 'Share Tech Mono', monospace;
       font-size: 16px;
       letter-spacing: 3px;
-      color: rgba(255,255,255,0.4);
+      color: #fff;
     }
 
     /* ── ACCENT LINE ─────────────────────────────────────────────── */
@@ -112,11 +112,11 @@
       font-size: 22px;
       font-weight: 300;
       letter-spacing: 4px;
-      color: rgba(232, 236, 244, 0.55);
+      color: #fff;
       text-transform: uppercase;
     }
     #last-seen-loc {
-      color: rgba(232, 236, 244, 0.85);
+      color: #fff;
       font-weight: 400;
     }
     .hero-dot {
@@ -165,7 +165,7 @@
       font-family: 'Share Tech Mono', monospace;
       font-size: 11px;
       letter-spacing: 3px;
-      color: rgba(255,255,255,0.3);
+      color: #fff;
       text-transform: uppercase;
       pointer-events: none;
     }
@@ -178,51 +178,93 @@
       align-items: center;
       justify-content: center;
       gap: 0;
-      height: 72px;
+      height: 146px;
       border-top: 1px solid rgba(255,255,255,0.06);
       border-bottom: 1px solid rgba(255,255,255,0.06);
       margin-top: 18px;
+      padding: 0 120px;
     }
     .stat-cell {
+      flex: 1;
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 0 52px;
+      justify-content: center;
+      gap: 24px;
     }
     .stat-cell + .stat-cell {
       border-left: 1px solid rgba(255,255,255,0.08);
     }
     .stat-icon {
-      width: 40px;
-      height: 40px;
+      width: 78px;
+      height: 78px;
       filter: brightness(0.8) saturate(0.7);
     }
     .stat-val {
       font-family: 'Share Tech Mono', monospace;
-      font-size: 22px;
-      color: rgba(232,236,244,0.85);
+      font-size: 52px;
+      color: #fff;
       letter-spacing: 1px;
     }
     .stat-label {
-      font-size: 11px;
+      font-size: 22px;
       font-weight: 300;
       letter-spacing: 4px;
-      color: rgba(232,236,244,0.3);
+      color: #fff;
       text-transform: uppercase;
-      margin-top: 2px;
+      margin-top: 3px;
     }
     #trip-day-val {
-      font-size: 36px;
+      font-size: 52px;
       font-weight: 700;
-      color: rgba(232,236,244,0.9);
+      color: #fff;
       line-height: 1;
     }
     #trip-day-of {
-      font-size: 14px;
+      font-size: 22px;
       font-weight: 300;
       letter-spacing: 3px;
-      color: rgba(232,236,244,0.35);
-      margin-top: 1px;
+      color: #fff;
+      margin-top: 2px;
+    }
+
+    /* ── TIPS BAR ────────────────────────────────────────────────── */
+    #tips-bar {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 28px;
+      padding: 0 120px;
+      margin-top: 18px;
+      height: 72px;
+      background: rgba(77,143,255,0.07);
+      border-top: 1px solid rgba(77,143,255,0.2);
+      border-bottom: 1px solid rgba(77,143,255,0.2);
+    }
+    #tips-tag {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 6px;
+      color: #fff;
+      text-transform: uppercase;
+      flex-shrink: 0;
+      background: #4d8fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 7px 10px 7px 16px;
+      height: 40px;
+    }
+    #tips-text {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 30px;
+      font-weight: 600;
+      font-style: italic;
+      letter-spacing: 1px;
+      color: #fff;
+      transition: opacity 0.7s ease;
     }
 
     /* ── FOOTER ──────────────────────────────────────────────────── */
@@ -239,7 +281,7 @@
       font-size: 11px;
       font-weight: 300;
       letter-spacing: 6px;
-      color: rgba(255,255,255,0.14);
+      color: #fff;
       text-transform: uppercase;
     }
 
@@ -324,14 +366,20 @@
         <div class="stat-label">Last heading</div>
       </div>
     </div>
-    <div class="stat-cell" id="np-cell" style="display:none">
-      <img id="np-art" style="width:44px;height:44px;object-fit:cover;flex-shrink:0;" src="" alt="">
-      <div style="overflow:hidden;max-width:320px;">
-        <div style="font-size:11px;font-weight:300;letter-spacing:5px;color:rgba(232,236,244,0.35);text-transform:uppercase;margin-bottom:3px;">&#9654; Now Playing</div>
-        <div id="np-title" style="font-family:'Share Tech Mono',monospace;font-size:16px;color:rgba(232,236,244,0.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
-        <div id="np-artist" style="font-size:14px;font-weight:300;letter-spacing:2px;color:rgba(232,236,244,0.4);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+    <div class="stat-cell" id="np-cell">
+      <img id="np-art" style="width:auto;height:92px;object-fit:contain;flex-shrink:0;" src="/pdm.png" alt="Pandemonium Air">
+      <div style="overflow:hidden;max-width:560px;">
+        <div style="font-size:16px;font-weight:300;letter-spacing:5px;color:#fff;text-transform:uppercase;margin-bottom:4px;">&#9654; Now Playing</div>
+        <div id="np-title" style="font-family:'Share Tech Mono',monospace;font-size:52px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Pandemonium Air</div>
+        <div id="np-artist" style="font-size:22px;font-weight:300;letter-spacing:2px;color:#fff;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Internet Radio</div>
       </div>
     </div>
+  </div>
+
+  <!-- Tips -->
+  <div id="tips-bar">
+    <span id="tips-tag">Tip</span>
+    <span id="tips-text"></span>
   </div>
 
   <!-- Footer -->
@@ -416,23 +464,17 @@
       // Heading
       document.getElementById('wx-heading').textContent = d.heading || '---';
 
-      // Now playing
-      const np = d.now_playing;
-      const npCell = document.getElementById('np-cell');
-      if (np && np.active) {
-        document.getElementById('np-title').textContent  = np.title  || '';
-        document.getElementById('np-artist').textContent = np.artist || '';
-        if (np.art_url) document.getElementById('np-art').src = np.art_url;
-        npCell.style.display = 'flex';
-      } else {
-        npCell.style.display = 'none';
-      }
-
       // Trip day
       if (d.trip_day !== null && d.trip_day !== undefined) {
-        document.getElementById('trip-day-val').textContent = 'Day ' + d.trip_day;
-        document.getElementById('trip-day-of').textContent  =
-          d.trip_day + ' of ' + (d.trip_total || '?') + ' days';
+        if (d.trip_day < 0) {
+          const n = Math.abs(d.trip_day);
+          document.getElementById('trip-day-val').textContent = 'T−' + n;
+          document.getElementById('trip-day-of').textContent  = n === 1 ? '1 day to departure' : n + ' days to departure';
+        } else {
+          document.getElementById('trip-day-val').textContent = 'Day ' + d.trip_day;
+          document.getElementById('trip-day-of').textContent  =
+            d.trip_day + ' of ' + (d.trip_total || '?') + ' days';
+        }
       } else {
         document.getElementById('trip-day-val').textContent = '—';
         document.getElementById('trip-day-of').textContent  = d.trip_name || '';
@@ -469,6 +511,33 @@
     }
 
     poll();
+
+    // ── Tips ───────────────────────────────────────────────────────────
+    (async function initTips() {
+      let tips = [];
+      try {
+        const r = await fetch('/api/tips');
+        if (r.ok) tips = await r.json();
+      } catch (e) { console.warn('tips fetch failed', e); }
+      if (!tips.length) return;
+
+      for (let i = tips.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [tips[i], tips[j]] = [tips[j], tips[i]];
+      }
+      let idx = 0;
+      const el = document.getElementById('tips-text');
+      el.textContent = tips[0];
+
+      setInterval(() => {
+        el.style.opacity = '0';
+        setTimeout(() => {
+          idx = (idx + 1) % tips.length;
+          el.textContent = tips[idx];
+          el.style.opacity = '1';
+        }, 700);
+      }, 30000);
+    })();
   </script>
 </body>
 </html>
