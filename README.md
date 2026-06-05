@@ -10,11 +10,13 @@ Runs unattended on a Windows machine at home. Pulls GPS data from Traccar, fetch
 
 | URL | Purpose |
 |-----|---------|
-| `http://localhost:5000/live` | **LIVE** — transparent HUD over road footage. Speed, heading, location, clock, weather, mini map. |
-| `http://localhost:5000/dark` | **DARK** — full-screen broadcast card when the field feed drops. Last-known location, full route map, trip day. |
+| `http://localhost:5000/live` | **LIVE** — transparent HUD over road footage. Speed, heading, location, clock, weather, mini map, now playing. |
+| `http://localhost:5000/dark` | **DARK** — full-screen broadcast card when the field feed drops. Last-known location, full route map, trip day counter, cycling tips. |
+| `http://localhost:5000/mobile` | **MOBILE** — side-panel layout designed for a 1920×1080 canvas with a 608×1080 vertical phone video in the centre. Left panel: clock, location, map. Right panel: weather, stats, now playing. |
 | `http://localhost:5000/api/status` | Raw JSON — everything the overlays consume. |
+| `http://localhost:5000/api/tips` | JSON array of tips loaded from `tips.txt`. |
 
-Both overlays are 1920×1080. Set OBS browser source size to match.
+All overlays are 1920×1080. Set OBS browser source size to match.
 
 ---
 
@@ -106,6 +108,11 @@ Add two browser sources to your OBS scene collection:
 - Width: `1920`, Height: `1080`
 - Background colour: `#00000000` (transparent — the page itself is fully dark)
 
+**MOBILE overlay** (place over a scene where a vertical phone feed occupies the centre 608px):
+- URL: `http://localhost:5000/mobile`
+- Width: `1920`, Height: `1080`
+- Background colour: `#00000000` (transparent)
+
 ---
 
 ## Configuration
@@ -122,7 +129,7 @@ All settings live in `.env` (copy from `config.example.env`).
 | `FLASK_PORT` | `5000` | Port WATCHTOWER listens on |
 | `DB_PATH` | `route.db` | SQLite database file path |
 | `TRIP_NAME` | `2026 Reset Trip` | Shown on the dark overlay footer |
-| `TRIP_START_DATE` | `2026-06-16` | Used to calculate current trip day |
+| `TRIP_START_DATE` | `2026-06-16` | Used to calculate current trip day. Before departure, overlays show a T−N countdown. |
 | `TRIP_END_DATE` | `2026-06-23` | Used to calculate trip length |
 | `VEHICLE_NAME` | `Serenity` | Shown in the dark overlay headline |
 
@@ -138,12 +145,16 @@ Traccar (localhost:8082)
         app.py  ◄── OpenWeatherMap (every 10 min)
             │   ◄── Nominatim geocoder (every ~60 s)
             │   ◄── timezonefinder (offline)
+            │   ◄── Spotify (every 10 s, optional)
             │
             ├── route.db  (SQLite, persists full trip history)
+            ├── tips.txt  (loaded on each /api/tips request)
             │
-            └── /api/status  ◄── polled every 5 s by both overlays
-                    ├── /live  (OBS browser source)
-                    └── /dark  (OBS browser source)
+            ├── /api/status  ◄── polled every 5 s by all overlays
+            ├── /api/tips    ◄── fetched on page load by /live and /dark
+            ├── /live    (OBS browser source)
+            ├── /dark    (OBS browser source)
+            └── /mobile  (OBS browser source)
 ```
 
 WATCHTOWER does **not** handle:
@@ -151,6 +162,19 @@ WATCHTOWER does **not** handle:
 - GPS collection (that's Traccar)
 - Scene switching (that's OBS + Advanced Scene Switcher)
 - Pushing to YouTube (that's OBS)
+
+---
+
+## Tips
+
+`tips.txt` in the project root supplies the rotating tip bar shown at the bottom of `/live` and `/dark`. Tips cycle every 30 seconds in a shuffled random order.
+
+Format — one tip per line:
+```
+TIP|Your tip text here.
+```
+
+Add as many lines as you like. Changes take effect after a server restart.
 
 ---
 
