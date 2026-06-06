@@ -8,17 +8,10 @@ from datetime import datetime, timezone, date
 from zoneinfo import ZoneInfo
 
 import requests
-from flask import Flask, jsonify, render_template, send_from_directory
+from flask import Flask, jsonify, render_template
 from flask_cors import CORS
 from timezonefinder import TimezoneFinder
 from dotenv import load_dotenv
-
-try:
-    import spotipy
-    from spotipy.oauth2 import SpotifyOAuth
-    _SPOTIPY_AVAILABLE = True
-except ImportError:
-    _SPOTIPY_AVAILABLE = False
 
 load_dotenv()
 
@@ -36,11 +29,6 @@ TRIP_START_DATE   = os.getenv("TRIP_START_DATE", "2026-06-16")
 TRIP_END_DATE     = os.getenv("TRIP_END_DATE", "2026-06-23")
 VEHICLE_NAME      = os.getenv("VEHICLE_NAME", "Serenity")
 TRIP_NAME         = os.getenv("TRIP_NAME", "2026 Reset Trip")
-SPOTIFY_CLIENT_ID     = os.getenv("SPOTIFY_CLIENT_ID", "")
-SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET", "")
-SPOTIFY_REDIRECT_URI  = os.getenv("SPOTIFY_REDIRECT_URI", "http://localhost:8888/callback")
-SPOTIFY_CACHE_PATH    = ".spotify_cache"
-
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
@@ -66,7 +54,6 @@ _state = {
     "trip_day": None, "trip_total": None,
     "vehicle_name": VEHICLE_NAME,
     "trip_name": TRIP_NAME,
-    "now_playing": {"active": False, "title": None, "artist": None, "art_url": None},
     "elevation_ft": None,
     "odometer_miles": 0.0,
     "state_crossing": None,
@@ -280,55 +267,6 @@ def local_time_at(lat, lon):
         log.error("Timezone: %s", e)
     return "--:-- --", "---"
 
-# ── Spotify ───────────────────────────────────────────────────────────────────
-_sp_client = None
-
-def _get_spotify():
-    global _sp_client
-    if not _SPOTIPY_AVAILABLE:
-        return None
-    if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
-        return None
-    if not os.path.exists(SPOTIFY_CACHE_PATH):
-        return None
-    if _sp_client is None:
-        try:
-            auth = SpotifyOAuth(
-                client_id=SPOTIFY_CLIENT_ID,
-                client_secret=SPOTIFY_CLIENT_SECRET,
-                redirect_uri=SPOTIFY_REDIRECT_URI,
-                scope="user-read-currently-playing user-read-playback-state",
-                cache_path=SPOTIFY_CACHE_PATH,
-                open_browser=False,
-            )
-            _sp_client = spotipy.Spotify(auth_manager=auth)
-        except Exception as e:
-            log.error("Spotify init: %s", e)
-    return _sp_client
-
-def _spotify_poll():
-    while True:
-        sp = _get_spotify()
-        if sp:
-            try:
-                result = sp.current_playback()
-                if result and result.get("is_playing") and result.get("item"):
-                    track  = result["item"]
-                    images = track["album"]["images"]
-                    now_playing = {
-                        "active":   True,
-                        "title":    track["name"],
-                        "artist":   ", ".join(a["name"] for a in track["artists"]),
-                        "art_url":  images[0]["url"] if images else None,
-                    }
-                else:
-                    now_playing = {"active": False}
-                with _lock:
-                    _state["now_playing"] = now_playing
-            except Exception as e:
-                log.error("Spotify poll: %s", e)
-        time.sleep(15)
-
 # ── Traccar poll thread ───────────────────────────────────────────────────────
 def _traccar_poll():
     while True:
@@ -446,10 +384,6 @@ def _traccar_poll():
         time.sleep(3)
 
 # ── Routes ────────────────────────────────────────────────────────────────────
-@app.route("/pdm.png")
-def pdm_art():
-    return send_from_directory(".", "pdm.png")
-
 @app.route("/api/status")
 def api_status():
     with _lock:
@@ -505,12 +439,6 @@ if __name__ == "__main__":
 
     threading.Thread(target=_traccar_poll, daemon=True).start()
     log.info("Traccar poll thread started")
-
-    if _SPOTIPY_AVAILABLE and SPOTIFY_CLIENT_ID and os.path.exists(SPOTIFY_CACHE_PATH):
-        threading.Thread(target=_spotify_poll, daemon=True).start()
-        log.info("Spotify poll thread started")
-    else:
-        log.info("Spotify not configured — skipping (run auth_spotify.py to enable)")
 
     try:
         from waitress import serve

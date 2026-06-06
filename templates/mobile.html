@@ -200,52 +200,6 @@
       color: #fff;
     }
 
-    /* ── RIGHT: NOW PLAYING ──────────────────────────────────── */
-    #mob-np {
-      flex-shrink: 0;
-      padding: 20px 28px;
-      border-bottom: 1px solid rgba(255,255,255,0.07);
-      display: none;
-    }
-    #mob-np.active { display: block; }
-    #mob-np-label {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 14px;
-      font-weight: 700;
-      letter-spacing: 5px;
-      color: #fff;
-      text-transform: uppercase;
-      margin-bottom: 12px;
-    }
-    #mob-np-inner {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-    #mob-np-art {
-      width: 72px;
-      height: 72px;
-      object-fit: cover;
-      flex-shrink: 0;
-    }
-    #mob-np-text { overflow: hidden; }
-    #mob-np-title {
-      font-size: 20px;
-      color: #fff;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    #mob-np-artist {
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 15px;
-      color: #fff;
-      margin-top: 4px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
     /* ── RIGHT: GPS SIGNAL LOST ──────────────────────────────── */
     #mob-stale {
       position: absolute;
@@ -368,16 +322,6 @@
         <div class="mob-stat-val" id="mob-day-val">—</div>
       </div>
     </div>
-    <div id="mob-np">
-      <div id="mob-np-label">&#9654; Now Playing</div>
-      <div id="mob-np-inner">
-        <img id="mob-np-art" src="" alt="">
-        <div id="mob-np-text">
-          <div id="mob-np-title"></div>
-          <div id="mob-np-artist"></div>
-        </div>
-      </div>
-    </div>
     <div id="mob-stale">&#9888; GPS Signal Lost</div>
   </div>
 
@@ -470,18 +414,6 @@
           lastCrossingAt = sc.at;
           showStateBanner(sc.name);
         }
-      }
-
-      // Now playing
-      const np = d.now_playing;
-      const npEl = document.getElementById('mob-np');
-      if (np && np.active) {
-        document.getElementById('mob-np-title').textContent  = np.title  || '';
-        document.getElementById('mob-np-artist').textContent = np.artist || '';
-        if (np.art_url) document.getElementById('mob-np-art').src = np.art_url;
-        npEl.classList.add('active');
-      } else {
-        npEl.classList.remove('active');
       }
 
       // Map
