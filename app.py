@@ -8,7 +8,7 @@ from datetime import datetime, timezone, date
 from zoneinfo import ZoneInfo
 
 import requests
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, send_from_directory
 from flask_cors import CORS
 from timezonefinder import TimezoneFinder
 from dotenv import load_dotenv
@@ -384,6 +384,10 @@ def _traccar_poll():
         time.sleep(3)
 
 # ── Routes ────────────────────────────────────────────────────────────────────
+@app.route("/pdm.png")
+def pdm_art():
+    return send_from_directory(".", "pdm.png")
+
 @app.route("/api/status")
 def api_status():
     with _lock:
