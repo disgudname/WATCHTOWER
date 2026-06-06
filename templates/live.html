@@ -36,60 +36,6 @@
       backdrop-filter: blur(8px);
     }
 
-    /* ── SPEED BLOCK  bottom-left ─────────────────────────────── */
-    #speed-block {
-      left: 44px;
-      bottom: 178px;
-      padding: 18px 30px 14px 26px;
-      min-width: 210px;
-    }
-
-    #speed-num {
-      font-size: 136px;
-      line-height: 1;
-      letter-spacing: -6px;
-      color: #fff;
-      transition: color 0.4s;
-      min-width: 2ch;
-    }
-    #speed-num.stale { color: #fff; }
-
-    #speed-meta {
-      display: flex;
-      align-items: center;
-      gap: 0;
-      margin-top: 2px;
-    }
-    #speed-unit {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 38px;
-      font-weight: 700;
-      letter-spacing: 5px;
-      color: #fff;
-      padding-right: 18px;
-    }
-    #heading-val {
-      font-size: 26px;
-      color: #e0e0e0;
-      border-left: 1px solid rgba(240,165,0,0.35);
-      padding-left: 18px;
-      letter-spacing: 2px;
-    }
-    #speed-details {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-top: 8px;
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 20px;
-      font-weight: 300;
-      letter-spacing: 3px;
-      color: #fff;
-    }
-    .speed-detail-sep {
-      color: #f0a500;
-    }
-
     /* ── CLOCK BLOCK  top-right ───────────────────────────────── */
     #clock-block {
       top: 44px;
@@ -328,20 +274,6 @@
 </head>
 <body>
 
-  <!-- Speed -->
-  <div id="speed-block" class="panel">
-    <div id="speed-num">--</div>
-    <div id="speed-meta">
-      <span id="speed-unit">MPH</span>
-      <span id="heading-val">---</span>
-    </div>
-    <div id="speed-details">
-      <span id="elevation-val">--- ft MSL</span>
-      <span class="speed-detail-sep">·</span>
-      <span id="odometer-val">--- mi</span>
-    </div>
-  </div>
-
   <!-- State crossing banner -->
   <div id="state-banner">
     <div id="state-banner-label">Now entering</div>
@@ -425,25 +357,6 @@
     // ── Render ─────────────────────────────────────────────────────────
     function render(d) {
       const stale = d.stale;
-
-      // Speed
-      const numEl = document.getElementById('speed-num');
-      if (stale || d.speed_mph === null) {
-        numEl.textContent = '--';
-        numEl.classList.add('stale');
-      } else {
-        numEl.textContent = Math.round(d.speed_mph);
-        numEl.classList.remove('stale');
-      }
-
-      // Heading
-      document.getElementById('heading-val').textContent = d.heading || '---';
-
-      // Elevation & odometer
-      document.getElementById('elevation-val').textContent =
-        d.elevation_ft !== null ? d.elevation_ft.toLocaleString() + ' ft MSL' : '--- ft MSL';
-      document.getElementById('odometer-val').textContent =
-        d.odometer_miles ? d.odometer_miles.toLocaleString() + ' mi' : '--- mi';
 
       // Clock
       const timeStr = d.local_time || '--:-- --';
