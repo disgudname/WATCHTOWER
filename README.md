@@ -10,9 +10,9 @@ Runs unattended on a Windows machine at home. Pulls GPS data from Traccar, fetch
 
 | URL | Purpose |
 |-----|---------|
-| `http://localhost:5000/live` | **LIVE** — transparent HUD over road footage. Speed, heading, location, clock, weather, mini map, now playing. |
+| `http://localhost:5000/live` | **LIVE** — transparent HUD over road footage. Clock, location, weather, mini map, tips, state-crossing banner. |
 | `http://localhost:5000/dark` | **DARK** — full-screen broadcast card when the field feed drops. Last-known location, full route map, trip day counter, cycling tips. |
-| `http://localhost:5000/mobile` | **MOBILE** — side-panel layout designed for a 1920×1080 canvas with a 608×1080 vertical phone video in the centre. Left panel: clock, location, map. Right panel: weather, stats, now playing. |
+| `http://localhost:5000/mobile` | **MOBILE** — side-panel layout designed for a 1920×1080 canvas with a 608×1080 vertical phone video in the centre. Left panel: clock, location, map. Right panel: weather, stats. |
 | `http://localhost:5000/api/status` | Raw JSON — everything the overlays consume. |
 | `http://localhost:5000/api/tips` | JSON array of tips loaded from `tips.txt`. |
 
@@ -52,13 +52,12 @@ copy config.example.env .env
 notepad .env
 ```
 
-The two required fields:
+The required field:
 ```
-TRACCAR_PASS=yourpassword
 OPENWEATHERMAP_API_KEY=yourkey
 ```
 
-Everything else has sensible defaults. See [Configuration](#configuration) for the full reference.
+For Traccar auth, set either `TRACCAR_TOKEN` (preferred) or `TRACCAR_PASS`. See [Configuration](#configuration) for the full reference.
 
 **3. Run setup (as Administrator)**
 ```
@@ -122,9 +121,11 @@ All settings live in `.env` (copy from `config.example.env`).
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `TRACCAR_URL` | `http://localhost:8082` | Traccar API base URL |
-| `TRACCAR_USER` | `admin` | Traccar login username |
-| `TRACCAR_PASS` | — | Traccar login password **[required]** |
+| `TRACCAR_TOKEN` | — | Traccar API token (preferred auth — find it in Traccar: Settings → Account → Token) |
+| `TRACCAR_USER` | `admin` | Traccar username (fallback if `TRACCAR_TOKEN` is blank) |
+| `TRACCAR_PASS` | — | Traccar password (fallback if `TRACCAR_TOKEN` is blank) |
 | `TRACCAR_DEVICE_ID` | `1` | Device ID from Traccar (`/api/devices`) |
+| `TRACCAR_SSL_VERIFY` | `true` | Set to `false` to skip SSL cert verification (use if Traccar is on a self-signed cert) |
 | `OPENWEATHERMAP_API_KEY` | — | OWM free-tier API key **[required]** |
 | `FLASK_PORT` | `5000` | Port WATCHTOWER listens on |
 | `DB_PATH` | `route.db` | SQLite database file path |
@@ -145,7 +146,6 @@ Traccar (localhost:8082)
         app.py  ◄── OpenWeatherMap (every 10 min)
             │   ◄── Nominatim geocoder (every ~60 s)
             │   ◄── timezonefinder (offline)
-            │   ◄── Spotify (every 10 s, optional)
             │
             ├── route.db  (SQLite, persists full trip history)
             ├── tips.txt  (loaded on each /api/tips request)
@@ -175,37 +175,6 @@ TIP|Your tip text here.
 ```
 
 Add as many lines as you like. Changes take effect after a server restart.
-
----
-
-## Spotify Integration
-
-Optional. Shows the currently playing track on both overlays — album art, title, and artist. Hides automatically when nothing is playing.
-
-### Setup (once per machine)
-
-**1. Create a Spotify app**
-- Go to [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard)
-- Create a new app (name doesn't matter)
-- In the app settings, add `http://localhost:8888/callback` as a Redirect URI
-- Copy the Client ID and Client Secret
-
-**2. Add credentials to `.env`**
-```
-SPOTIFY_CLIENT_ID=your_client_id
-SPOTIFY_CLIENT_SECRET=your_client_secret
-```
-
-**3. Authorize**
-```
-venv\Scripts\python auth_spotify.py
-```
-
-A browser window will open. Log in and click Allow. You'll be redirected to a page that won't load — copy the full URL from the address bar and paste it when prompted. Token is saved to `.spotify_cache`.
-
-**4. Restart WATCHTOWER** — it will detect the cache file and start the Spotify poll thread automatically.
-
-> The token doesn't expire unless you revoke it in Spotify's app settings. You need to run `auth_spotify.py` once on your laptop and once on the home server before the trip.
 
 ---
 
