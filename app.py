@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import math
 import logging
@@ -57,6 +58,7 @@ _state = {
     "elevation_ft": None,
     "odometer_miles": 0.0,
     "state_crossing": None,
+    "highway": None,
 }
 
 # odometer and state-crossing tracking (poll thread only — no lock needed)
@@ -187,14 +189,27 @@ def trip_day_of():
 # ── Reverse geocoder ──────────────────────────────────────────────────────────
 _geo_lat = _geo_lon = None
 _geo_result   = "---"
+_geo_highway  = None
 _geo_last_req = 0.0
 
+_HW_RE = [
+    (re.compile(r'^(?:Interstate|I)\W*(\d+[A-Z]?)', re.I), 'I-{}'),
+    (re.compile(r'^(?:US(?:\s+(?:Route|Highway|Hwy))?|U\.S\.(?:\s+Route)?)\W*(\d+[A-Z]?)', re.I), 'US-{}'),
+]
+
+def parse_highway(road: str):
+    for pattern, fmt in _HW_RE:
+        m = pattern.match(road.strip())
+        if m:
+            return fmt.format(m.group(1))
+    return None
+
 def geocode(lat, lon):
-    global _geo_lat, _geo_lon, _geo_result, _geo_last_req
+    global _geo_lat, _geo_lon, _geo_result, _geo_highway, _geo_last_req
     if _geo_lat is not None and haversine_mi(lat, lon, _geo_lat, _geo_lon) < 0.5:
-        return _geo_result
+        return _geo_result, _geo_highway
     if time.time() - _geo_last_req < 1.0:
-        return _geo_result
+        return _geo_result, _geo_highway
     try:
         r = requests.get(
             "https://nominatim.openstreetmap.org/reverse",
@@ -208,12 +223,13 @@ def geocode(lat, lon):
         state_full = addr.get("state", "")
         state = _STATE_ABBR.get(state_full, state_full[:2].upper() if state_full else "")
         _geo_result = f"{city}, {state}".strip(", ") or "Unknown"
+        _geo_highway = parse_highway(addr.get("road", ""))
         _geo_lat, _geo_lon = lat, lon
     except Exception as e:
         log.error("Geocode: %s", e)
     finally:
         _geo_last_req = time.time()
-    return _geo_result
+    return _geo_result, _geo_highway
 
 # ── Weather ───────────────────────────────────────────────────────────────────
 _wx_temp = None
@@ -319,7 +335,7 @@ def _traccar_poll():
 
                 local_time, local_tz = local_time_at(lat, lon)
                 wx_temp, wx_desc, wx_icon = get_weather(lat, lon)
-                city_state = geocode(lat, lon)
+                city_state, highway = geocode(lat, lon)
                 trip_day, trip_total = trip_day_of()
 
                 try:
@@ -369,6 +385,7 @@ def _traccar_poll():
                         "trip_total": trip_total,
                         "elevation_ft": elevation_ft,
                         "odometer_miles": round(_state["odometer_miles"] + odo_delta, 1),
+                        "highway": highway,
                     }
                     if crossing:
                         updates["state_crossing"] = crossing

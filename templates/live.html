@@ -36,29 +36,6 @@
       backdrop-filter: blur(8px);
     }
 
-    /* ── CLOCK BLOCK  top-right ───────────────────────────────── */
-    #clock-block {
-      top: 44px;
-      right: 44px;
-      padding: 14px 22px 12px 22px;
-      text-align: right;
-      min-width: 300px;
-    }
-    #clock-time {
-      font-size: 58px;
-      line-height: 1;
-      letter-spacing: 2px;
-    }
-    #clock-tz {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 26px;
-      font-weight: 700;
-      letter-spacing: 7px;
-      color: #fff;
-      text-transform: uppercase;
-      margin-top: 5px;
-    }
-
     /* ── WEATHER (inline in loc-bar) ────────────────────────── */
     #wx-icon {
       width: 52px;
@@ -137,14 +114,6 @@
       50%       { opacity: 0.45; }
     }
 
-    #clock-colon {
-      animation: colon-blink 1s step-start infinite;
-    }
-    @keyframes colon-blink {
-      0%, 100% { opacity: 1; }
-      50%       { opacity: 0; }
-    }
-
     /* ── STATE CROSSING BANNER ───────────────────────────────── */
     #state-banner {
       position: absolute;
@@ -215,6 +184,29 @@
       transition: opacity 0.7s ease;
     }
 
+    /* ── HIGHWAY BADGE ──────────────────────────────────────── */
+    #highway-badge {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      padding: 5px 14px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      display: none;
+    }
+    #highway-badge:not(:empty) { display: inline-block; }
+    #highway-badge.hw-interstate {
+      background: #003f87;
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.35);
+    }
+    #highway-badge.hw-us {
+      background: #f0a500;
+      color: #000;
+      border: 1px solid rgba(0,0,0,0.2);
+    }
+
     /* custom position marker */
     .live-dot {
       width: 22px;
@@ -234,12 +226,6 @@
     <div id="state-banner-name"></div>
   </div>
 
-  <!-- Clock -->
-  <div id="clock-block" class="panel">
-    <div id="clock-time">--:-- --</div>
-    <div id="clock-tz">---</div>
-  </div>
-
   <!-- Mini map -->
   <div id="map-wrap" class="panel">
     <div id="map"></div>
@@ -250,6 +236,7 @@
     <img id="wx-icon" src="https://openweathermap.org/img/wn/01d@2x.png" alt="">
     <span id="wx-temp">---°F</span>
     <div class="loc-divider"></div>
+    <span id="highway-badge"></span>
     <span id="loc-val">---</span>
     <div class="loc-divider"></div>
     <span id="wx-desc">---</span>
@@ -302,14 +289,6 @@
     function render(d) {
       const stale = d.stale;
 
-      // Clock
-      const timeStr = d.local_time || '--:-- --';
-      const colonIdx = timeStr.indexOf(':');
-      document.getElementById('clock-time').innerHTML = colonIdx >= 0
-        ? timeStr.slice(0, colonIdx) + '<span id="clock-colon">:</span>' + timeStr.slice(colonIdx + 1)
-        : timeStr;
-      document.getElementById('clock-tz').textContent = d.local_timezone || '---';
-
       // Weather
       if (d.weather_temp_f !== null) {
         document.getElementById('wx-temp').textContent = d.weather_temp_f + '°F';
@@ -321,6 +300,16 @@
       // Location
       document.getElementById('loc-val').textContent =
         (d.city_state || '---').toUpperCase();
+
+      // Highway badge
+      const hwBadge = document.getElementById('highway-badge');
+      if (d.highway) {
+        hwBadge.textContent = d.highway;
+        hwBadge.className = d.highway.startsWith('I-') ? 'hw-interstate' : 'hw-us';
+        hwBadge.style.display = 'inline-block';
+      } else {
+        hwBadge.style.display = 'none';
+      }
 
       // Stale badge
       document.getElementById('stale-badge').classList.toggle('show', !!stale);
