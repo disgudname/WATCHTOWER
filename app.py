@@ -70,6 +70,8 @@ tf = TimezoneFinder()
 app = Flask(__name__)
 CORS(app)
 
+_http = requests.Session()
+
 # ── Database ──────────────────────────────────────────────────────────────────
 def init_db():
     with sqlite3.connect(DB_PATH) as conn:
@@ -211,7 +213,7 @@ def geocode(lat, lon):
     if time.time() - _geo_last_req < 1.0:
         return _geo_result, _geo_highway
     try:
-        r = requests.get(
+        r = _http.get(
             "https://nominatim.openstreetmap.org/reverse",
             params={"lat": lat, "lon": lon, "format": "json"},
             headers={"User-Agent": "WATCHTOWER/1.0 2026-reset-trip-overlay"},
@@ -242,7 +244,7 @@ def get_weather(lat, lon):
     if time.time() - _wx_last < 600:
         return _wx_temp, _wx_desc or "---", _wx_icon or "01d"
     try:
-        r = requests.get(
+        r = _http.get(
             "https://api.openweathermap.org/data/2.5/weather",
             params={"lat": lat, "lon": lon, "appid": OWM_KEY, "units": "imperial"},
             timeout=6,
@@ -288,7 +290,7 @@ def _traccar_poll():
     while True:
         try:
             headers = {"Authorization": f"Bearer {TRACCAR_TOKEN}"} if TRACCAR_TOKEN else {}
-            r = requests.get(
+            r = _http.get(
                 f"{TRACCAR_URL}/api/positions",
                 params={"deviceId": TRACCAR_DEVICE_ID},
                 headers=headers,
@@ -307,7 +309,7 @@ def _traccar_poll():
             # Device online/offline status
             stale = True
             try:
-                dr = requests.get(
+                dr = _http.get(
                     f"{TRACCAR_URL}/api/devices",
                     params={"id": TRACCAR_DEVICE_ID},
                     headers=headers,

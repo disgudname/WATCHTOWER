@@ -122,6 +122,7 @@ ExecStart=$PYTHON $ROOT/app.py
 Restart=on-failure
 RestartSec=5s
 EnvironmentFile=$ROOT/.env
+LimitNOFILE=65536
 
 [Install]
 WantedBy=default.target
