@@ -432,6 +432,9 @@
 
     // ── State ──────────────────────────────────────────────────────────
     let mapFitted = false;
+    let fullRoute = [];
+    let liveTrail = [];
+    let lastPt    = null;
 
     // ── Render ─────────────────────────────────────────────────────────
     function render(d) {
@@ -480,24 +483,39 @@
         document.getElementById('trip-day-of').textContent  = d.trip_name || '';
       }
 
-      // Map
-      if (d.route && d.route.length > 0) {
-        routeLine.setLatLngs(d.route);
-        document.getElementById('map-pts').textContent = d.route.length;
-
-        if (d.lat && d.lon) {
-          posMarker.setLatLng([d.lat, d.lon]);
-        }
-
-        // Fit bounds once, then let it be — only re-fit if route grows significantly
-        if (!mapFitted || d.route.length % 50 === 0) {
-          try {
-            map.fitBounds(routeLine.getBounds(), { padding: [40, 40], maxZoom: 12 });
-            mapFitted = true;
-          } catch (e) { /* single-point edge case */ }
+      // Map — append new points; full route loaded separately via loadRoute()
+      if (d.lat && d.lon) {
+        posMarker.setLatLng([d.lat, d.lon]);
+        const pt = [d.lat, d.lon];
+        if (!lastPt || pt[0] !== lastPt[0] || pt[1] !== lastPt[1]) {
+          liveTrail.push(pt);
+          lastPt = pt;
+          routeLine.setLatLngs([...fullRoute, ...liveTrail]);
+          document.getElementById('map-pts').textContent = fullRoute.length + liveTrail.length;
         }
       }
     }
+
+    // ── Full route (loaded once on page open) ──────────────────────────
+    (async function loadRoute() {
+      try {
+        const r = await fetch('/api/route');
+        if (!r.ok) return;
+        const data = await r.json();
+        fullRoute = data.route || [];
+        if (fullRoute.length > 0) {
+          lastPt = fullRoute[fullRoute.length - 1];
+          routeLine.setLatLngs(fullRoute);
+          document.getElementById('map-pts').textContent = fullRoute.length;
+          try {
+            map.fitBounds(routeLine.getBounds(), { padding: [40, 40], maxZoom: 12 });
+            mapFitted = true;
+          } catch (e) {}
+        }
+      } catch (e) {
+        console.warn('route load error', e);
+      }
+    })();
 
     // ── Poll ───────────────────────────────────────────────────────────
     async function poll() {

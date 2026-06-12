@@ -331,10 +331,8 @@
           map.panTo([d.lat, d.lon], { animate: true, duration: 1 });
           lastLat = d.lat; lastLon = d.lon;
         }
-        // Show last 200 points on the mini-map to keep it readable
         if (d.route && d.route.length > 0) {
-          const tail = d.route.slice(-200);
-          routeLine.setLatLngs(tail);
+          routeLine.setLatLngs(d.route);
         }
       }
     }

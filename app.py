@@ -99,12 +99,18 @@ def db_save(ts, lat, lon, speed_mph, heading_deg, city_state):
     except Exception as e:
         log.error("DB write: %s", e)
 
-def db_load_route():
+def db_load_route(limit=None):
     try:
         with sqlite3.connect(DB_PATH) as conn:
-            rows = conn.execute(
-                "SELECT lat,lon FROM positions ORDER BY timestamp"
-            ).fetchall()
+            if limit:
+                rows = conn.execute(
+                    "SELECT lat,lon FROM positions ORDER BY timestamp DESC LIMIT ?", (limit,)
+                ).fetchall()
+                rows = list(reversed(rows))
+            else:
+                rows = conn.execute(
+                    "SELECT lat,lon FROM positions ORDER BY timestamp"
+                ).fetchall()
         return [[round(r[0], 5), round(r[1], 5)] for r in rows]
     except Exception as e:
         log.error("DB read: %s", e)
@@ -374,6 +380,8 @@ def _traccar_poll():
                 with _lock:
                     if not _state["route"] or _state["route"][-1] != point:
                         _state["route"].append(point)
+                        if len(_state["route"]) > 200:
+                            _state["route"].pop(0)
                     updates = {
                         "lat": lat, "lon": lon,
                         "speed_mph": round(speed_mph, 1),
@@ -415,6 +423,10 @@ def api_status():
     with _lock:
         return jsonify(dict(_state))
 
+@app.route("/api/route")
+def api_route():
+    return jsonify({"route": db_load_route()})
+
 @app.route("/api/tips")
 def api_tips():
     tips_path = os.path.join(os.path.dirname(__file__), "tips.txt")
@@ -453,7 +465,7 @@ def index():
 if __name__ == "__main__":
     init_db()
 
-    history = db_load_route()
+    history = db_load_route(limit=200)
     odo = db_compute_odometer()
     last_lat, last_lon = db_last_position()
     with _lock:
@@ -461,7 +473,7 @@ if __name__ == "__main__":
         _state["odometer_miles"] = odo
     if last_lat is not None:
         _odo_last_lat, _odo_last_lon = last_lat, last_lon
-    log.info("Loaded %d route points from DB, odometer %.1f mi", len(history), odo)
+    log.info("Loaded %d route points into RAM, odometer %.1f mi", len(history), odo)
 
     threading.Thread(target=_traccar_poll, daemon=True).start()
     log.info("Traccar poll thread started")
