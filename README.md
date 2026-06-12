@@ -10,7 +10,7 @@ Runs unattended on a Windows machine at home. Pulls GPS data from Traccar, fetch
 
 | URL | Purpose |
 |-----|---------|
-| `http://localhost:5000/live` | **LIVE** — transparent HUD over road footage. Clock, location, weather, mini map, tips, state-crossing banner. |
+| `http://localhost:5000/live` | **LIVE** — transparent HUD over road footage. Location, highway badge, weather, mini map, tips, state-crossing banner. |
 | `http://localhost:5000/dark` | **DARK** — full-screen broadcast card when the field feed drops. Last-known location, full route map, trip day counter, cycling tips. |
 | `http://localhost:5000/mobile` | **MOBILE** — side-panel layout designed for a 1920×1080 canvas with a 608×1080 vertical phone video in the centre. Left panel: clock, location, map. Right panel: weather, stats. |
 | `http://localhost:5000/api/status` | Raw JSON — everything the overlays consume. |
@@ -24,10 +24,20 @@ All overlays are 1920×1080. Set OBS browser source size to match.
 
 Two paths depending on what you're doing:
 
+**Windows (PowerShell):**
+
 | | `setup.ps1` | `dev.ps1` |
 |---|---|---|
 | **Use for** | Production home machine | Local testing / laptop |
 | **Requires admin** | Yes (Task Scheduler) | No |
+| **Auto-starts on boot** | Yes | No — foreground process, Ctrl+C to stop |
+
+**Linux (bash):**
+
+| | `setup.sh` | `dev.sh` |
+|---|---|---|
+| **Use for** | Production Linux machine | Local testing |
+| **Requires sudo** | No (systemd user service) | No |
 | **Auto-starts on boot** | Yes | No — foreground process, Ctrl+C to stop |
 
 ### Prerequisites
@@ -144,13 +154,17 @@ Traccar (localhost:8082)
             │
             ▼
         app.py  ◄── OpenWeatherMap (every 10 min)
-            │   ◄── Nominatim geocoder (every ~60 s)
+            │   ◄── Nominatim geocoder (every ~0.5 mi)
             │   ◄── timezonefinder (offline)
             │
             ├── route.db  (SQLite, persists full trip history)
             ├── tips.txt  (loaded on each /api/tips request)
             │
             ├── /api/status  ◄── polled every 5 s by all overlays
+            │     fields: lat/lon, speed_mph, heading, city_state,
+            │             highway, elevation_ft, odometer_miles,
+            │             local_time, weather_*, stale,
+            │             trip_day/total, state_crossing
             ├── /api/tips    ◄── fetched on page load by /live and /dark
             ├── /live    (OBS browser source)
             ├── /dark    (OBS browser source)
@@ -180,9 +194,9 @@ Add as many lines as you like. Changes take effect after a server restart.
 
 ## Staleness
 
-If the GPS fix is more than 30 seconds old:
+Staleness is determined by Traccar's device status (`online` vs `offline`), checked every ~15 seconds. When the device goes offline:
 - `/api/status` sets `"stale": true`
-- `/live` shows a pulsing **SIGNAL LOST** badge and blanks the speed readout
+- `/live` shows a pulsing **GPS SIGNAL LOST** badge
 - `/dark` continues showing last-known position with a live-counting age timer ("14 min ago")
 
 ---
