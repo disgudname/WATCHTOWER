@@ -287,8 +287,10 @@ def local_time_at(lat, lon):
 
 # ── Traccar poll thread ───────────────────────────────────────────────────────
 def _traccar_poll():
+    _poll_count = 0
     while True:
         try:
+            _poll_count += 1
             headers = {"Authorization": f"Bearer {TRACCAR_TOKEN}"} if TRACCAR_TOKEN else {}
             r = _http.get(
                 f"{TRACCAR_URL}/api/positions",
@@ -306,23 +308,24 @@ def _traccar_poll():
                 continue
             positions = r.json()
 
-            # Device online/offline status
-            stale = True
-            try:
-                dr = _http.get(
-                    f"{TRACCAR_URL}/api/devices",
-                    params={"id": TRACCAR_DEVICE_ID},
-                    headers=headers,
-                    auth=None if TRACCAR_TOKEN else (TRACCAR_USER, TRACCAR_PASS),
-                    timeout=5,
-                    verify=TRACCAR_SSL_VERIFY,
-                )
-                if dr.status_code == 200:
-                    devices = dr.json()
-                    if devices:
-                        stale = devices[0].get("status", "offline") != "online"
-            except Exception as e:
-                log.error("Traccar device status: %s", e)
+            # Device online/offline status — checked every 3rd poll (~15 s)
+            stale = _state["stale"]
+            if _poll_count % 3 == 1:
+                try:
+                    dr = _http.get(
+                        f"{TRACCAR_URL}/api/devices",
+                        params={"id": TRACCAR_DEVICE_ID},
+                        headers=headers,
+                        auth=None if TRACCAR_TOKEN else (TRACCAR_USER, TRACCAR_PASS),
+                        timeout=5,
+                        verify=TRACCAR_SSL_VERIFY,
+                    )
+                    if dr.status_code == 200:
+                        devices = dr.json()
+                        if devices:
+                            stale = devices[0].get("status", "offline") != "online"
+                except Exception as e:
+                    log.error("Traccar device status: %s", e)
 
             if positions:
                 global _odo_last_lat, _odo_last_lon, _prev_state_abbr
@@ -400,7 +403,7 @@ def _traccar_poll():
             with _lock:
                 _state["stale"] = True
 
-        time.sleep(3)
+        time.sleep(5)
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 @app.route("/pdm.png")
