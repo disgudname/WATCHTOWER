@@ -2,7 +2,7 @@
 
 Home base relay and overlay server for the **2026 Reset Trip** livestream.
 
-Runs unattended on a Windows machine at home. Pulls GPS data from Traccar, fetches weather and reverse geocoding, and serves two OBS browser-source overlays for a YouTube road-trip stream.
+Runs unattended on a Windows machine at home. Pulls GPS data from Traccar, fetches weather and reverse geocoding, and serves OBS browser-source overlays for a YouTube road-trip stream. Maps show live weather radar, NWS alerts, FAA TFRs, and ADS-B aircraft pulled from [Pandemonium EOC](https://eoc.pandemoniumair.com/).
 
 ---
 
@@ -10,13 +10,33 @@ Runs unattended on a Windows machine at home. Pulls GPS data from Traccar, fetch
 
 | URL | Purpose |
 |-----|---------|
-| `http://localhost:5000/live` | **LIVE** — transparent HUD over road footage. Location, highway badge, weather, mini map, tips, state-crossing banner. |
-| `http://localhost:5000/dark` | **DARK** — full-screen broadcast card when the field feed drops. Last-known location, full route map, trip day counter, cycling tips. |
-| `http://localhost:5000/mobile` | **MOBILE** — side-panel layout designed for a 1920×1080 canvas with a 608×1080 vertical phone video in the centre. Left panel: clock, location, map. Right panel: weather, stats. |
-| `http://localhost:5000/api/status` | Raw JSON — everything the overlays consume. |
-| `http://localhost:5000/api/tips` | JSON array of tips loaded from `tips.txt`. |
+| `/live` | **LIVE** — transparent HUD over road footage. Location, highway badge, weather, mini map with overlays, tips, state-crossing banner. |
+| `/dark` | **DARK** — full-screen broadcast card when the field feed drops. Last-known location, full route map with overlays, trip day counter, cycling tips. |
+| `/mobile` | **MOBILE** — side-panel layout for a 1920×1080 canvas with a 608×1080 vertical phone feed in the centre. |
+| `/api/status` | Raw JSON — everything the overlays consume. |
+| `/api/route` | Full trip route as `[[lat,lon],…]` from the database. |
+| `/api/tips` | JSON array of tips loaded from `tips.txt`. |
 
 All overlays are 1920×1080. Set OBS browser source size to match.
+
+---
+
+## Map overlays
+
+Both `/live` and `/dark` run MapLibre GL JS maps with four live data layers stacked in this order (bottom to top):
+
+| Layer | Source | Refresh |
+|-------|--------|---------|
+| **NOAA MRMS radar** | `/proxy/weather-radar` → EOC | 5-minute frame fetch; 15-frame animation loops continuously at ~300 ms/frame |
+| **NWS weather alerts** | `/proxy/weather-alerts` → EOC | Every 2 min. Polygons colored by severity. Tornado/severe thunderstorm warnings flash white. |
+| **FAA TFRs** | `/proxy/aviation` → EOC | Every 5 min. Filled polygons with colored outline + white halo. |
+| **ADS-B aircraft** | `/proxy/adsb` → EOC | Every 15 s. tar1090-style silhouettes rotated to heading, colored by altitude. |
+| **Route line** | `/api/status` | Every 5 s |
+| **Position marker** | `/api/status` | Every 5 s |
+
+All EOC data is fetched server-side through Flask proxy routes — the browser never crosses origins.
+
+The `/dark` map fits its zoom to the full route on load. The `/live` map stays at zoom 11 and follows the vehicle.
 
 ---
 
@@ -160,16 +180,33 @@ Traccar (localhost:8082)
             ├── route.db  (SQLite, persists full trip history)
             ├── tips.txt  (loaded on each /api/tips request)
             │
-            ├── /api/status  ◄── polled every 5 s by all overlays
+            ├── /api/status     ◄── polled every 5 s by all overlays
             │     fields: lat/lon, speed_mph, heading, city_state,
             │             highway, elevation_ft, odometer_miles,
             │             local_time, weather_*, stale,
-            │             trip_day/total, state_crossing
-            ├── /api/tips    ◄── fetched on page load by /live and /dark
-            ├── /live    (OBS browser source)
-            ├── /dark    (OBS browser source)
+            │             trip_day/total, state_crossing, route[]
+            ├── /api/route      ◄── full DB route, fetched once on /dark load
+            ├── /api/tips       ◄── fetched on page load by /live and /dark
+            │
+            ├── /proxy/adsb            ─┐
+            ├── /proxy/aviation         ├── Flask pass-through to
+            ├── /proxy/weather-alerts   │   eoc.pandemoniumair.com
+            ├── /proxy/weather-radar   ─┘   (avoids CORS, keeps browser
+            │                               on same origin)
+            ├── /live    (OBS browser source — MapLibre GL JS)
+            ├── /dark    (OBS browser source — MapLibre GL JS)
             └── /mobile  (OBS browser source)
 ```
+
+### External data sources
+
+| Source | What it provides | Key |
+|--------|-----------------|-----|
+| Traccar | GPS position, speed, heading, altitude | Token / password |
+| OpenWeatherMap | Temperature, conditions, icon | API key (free tier) |
+| Nominatim | City/state reverse geocoding, road name | None |
+| timezonefinder | Local timezone (offline lookup) | None |
+| Pandemonium EOC | ADS-B aircraft, NOAA MRMS radar, NWS alerts, FAA TFRs | None (proxied) |
 
 WATCHTOWER does **not** handle:
 - RTMP video ingest (that's node-media-server)
@@ -215,6 +252,8 @@ Get-Content watchtower.log -Wait
 
 - **Python 3.9+** — Flask, flask-cors, waitress, requests, timezonefinder, python-dotenv
 - **SQLite** — route history (stdlib, no install)
-- **Leaflet.js** — maps via CDN, OpenStreetMap / CartoDB Dark tiles
+- **MapLibre GL JS 4.7.1** — GPU-rendered maps via CDN, CartoDB Light raster tiles
+- **adsb-markers.js** — vendored tar1090 aircraft shape/color library (from Pandemonium EOC)
 - **OpenWeatherMap** — weather (free tier)
 - **Nominatim** — reverse geocoding (free, no key)
+- **Pandemonium EOC** — ADS-B, radar, NWS alerts, FAA TFRs (proxied through Flask)
