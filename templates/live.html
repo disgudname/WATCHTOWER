@@ -117,7 +117,7 @@
     #tips-text {
       font-family: 'Barlow Condensed', sans-serif;
       font-size: 30px; font-weight: 600; font-style: italic;
-      letter-spacing: 1px; color: #fff; transition: opacity 0.7s ease;
+      letter-spacing: 1px; color: #fff; transition: opacity 0.3s ease;
     }
 
     #highway-badge {
@@ -583,7 +583,7 @@
         }
         wxFlashOn = !wxFlashOn;
         try { map.setPaintProperty(WX_FLASH, 'line-opacity', wxFlashOn ? 0.92 : 0); } catch {}
-      }, 800);
+      }, 1200);
 
       // Marching-ants timer — only runs when there are PDS/EMERGENCY/OBSERVED features
       let wxMarchIdx = 0;
@@ -591,7 +591,7 @@
         if (!wxHasMarch) return;
         wxMarchIdx = (wxMarchIdx + 1) % WX_MARCH_FRAMES.length;
         try { map.setPaintProperty(WX_MARCH, 'line-dasharray', WX_MARCH_FRAMES[wxMarchIdx]); } catch {}
-      }, 50);
+      }, 150);
 
       loadRoute();
     });
@@ -639,7 +639,7 @@
 
         if (!radarTimer) {
           radarFrameIdx = 0;
-          radarTimer = setInterval(stepRadarFrame, Math.max(200, d.frame_interval_ms || 300));
+          radarTimer = setInterval(stepRadarFrame, Math.max(500, d.frame_interval_ms || 500));
         }
       } catch (e) {
         console.warn('[radar]', e);
@@ -1060,7 +1060,7 @@
       } catch {
         document.getElementById('stale-badge').classList.add('show');
       }
-      setTimeout(poll, 5000);
+      setTimeout(poll, 10000);
     }
 
     poll();

@@ -23,7 +23,7 @@
       position: fixed;
       inset: 0;
       background-image: radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px);
-      background-size: 28px 28px;
+      background-size: 48px 48px;
       pointer-events: none;
       z-index: 0;
     }
@@ -130,7 +130,7 @@
     }
     #tips-text {
       font-family: 'Barlow Condensed', sans-serif; font-size: 30px; font-weight: 600;
-      font-style: italic; letter-spacing: 1px; color: #fff; transition: opacity 0.7s ease;
+      font-style: italic; letter-spacing: 1px; color: #fff; transition: opacity 0.3s ease;
     }
 
     /* ── FOOTER ──────────────────────────────────────────────────── */
@@ -147,6 +147,7 @@
       position: absolute; inset: 0; border-radius: 50%;
       border: 2px solid rgba(77,143,255,0.5);
       animation: ring-expand 2.2s ease-out infinite;
+      will-change: transform, opacity;
     }
     @keyframes ring-expand {
       0%   { transform: scale(0.6); opacity: 0.9; }
@@ -646,7 +647,7 @@
         }
         wxFlashOn = !wxFlashOn;
         try { map.setPaintProperty(WX_FLASH, 'line-opacity', wxFlashOn ? 0.92 : 0); } catch {}
-      }, 800);
+      }, 1200);
 
       // Marching-ants timer — only runs when there are PDS/EMERGENCY/OBSERVED features
       let wxMarchIdx = 0;
@@ -654,7 +655,7 @@
         if (!wxHasMarch) return;
         wxMarchIdx = (wxMarchIdx + 1) % WX_MARCH_FRAMES.length;
         try { map.setPaintProperty(WX_MARCH, 'line-dasharray', WX_MARCH_FRAMES[wxMarchIdx]); } catch {}
-      }, 50);
+      }, 150);
 
       // ── Load full route from DB ──
       loadRoute();
@@ -701,7 +702,7 @@
 
         if (!radarTimer) {
           radarFrameIdx = 0;
-          radarTimer = setInterval(stepRadarFrame, Math.max(200, d.frame_interval_ms || 300));
+          radarTimer = setInterval(stepRadarFrame, Math.max(500, d.frame_interval_ms || 500));
         }
       } catch (e) {
         console.warn('[radar]', e);
@@ -1066,10 +1067,10 @@
 
     setInterval(() => {
       if (currentAge !== null) {
-        currentAge++;
+        currentAge += 30;
         document.getElementById('last-seen-age').textContent = formatAge(currentAge);
       }
-    }, 1000);
+    }, 30000);
 
     // ── Status poll ───────────────────────────────────────────────────────
     function render(d) {
@@ -1137,7 +1138,7 @@
       } catch (e) {
         console.warn('poll error', e);
       }
-      setTimeout(poll, 5000);
+      setTimeout(poll, 10000);
     }
 
     poll();

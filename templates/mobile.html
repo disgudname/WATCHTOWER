@@ -274,6 +274,7 @@
       border-radius: 50%;
       border: 2px solid rgba(240, 165, 0, 0.55);
       animation: ring-expand 2.2s ease-out infinite;
+      will-change: transform, opacity;
     }
     @keyframes ring-expand {
       0%   { transform: scale(0.6); opacity: 0.9; }
@@ -459,7 +460,7 @@
         console.warn('poll error', e);
         document.getElementById('mob-stale').classList.add('show');
       }
-      setTimeout(poll, 5000);
+      setTimeout(poll, 10000);
     }
 
     poll();
