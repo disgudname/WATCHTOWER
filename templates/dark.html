@@ -430,6 +430,7 @@
       // ── ADS-B symbols ──
       map.addLayer({
         id: ADSB_LYR, type: 'symbol', source: ADSB_SRC,
+        minzoom: 7,
         layout: {
           'icon-image':              ['get', 'icon'],
           'icon-size':               ['get', 'scale'],
@@ -807,6 +808,7 @@
 
     async function refreshAdsb() {
       if (adsbLat == null || adsbLon == null) return;
+      try { if (map.getZoom() < 7) return; } catch (_) {}
       try {
         const res = await fetch(`/proxy/adsb?lat=${adsbLat}&lon=${adsbLon}&dist=250`);
         const d   = await res.json();
