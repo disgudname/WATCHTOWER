@@ -197,44 +197,214 @@
     ];
     const MOTION_FORECAST_MIN = 30;
 
-    // ── Map ───────────────────────────────────────────────────────────────
-    const map = new maplibregl.Map({
-      container: 'map',
-      style: {
-        version: 8,
-        sources: {
-          carto: {
-            type: 'raster',
-            tiles: [
-              'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-              'https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-              'https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-              'https://d.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-            ],
-            tileSize: 256,
-            maxzoom: 19,
-          },
-        },
-        layers: [{ id: 'carto', type: 'raster', source: 'carto' }],
-      },
-      center: [-98.35, 39.5],
-      zoom: 11,
-      interactive: false,
-      attributionControl: false,
-    });
+    // ── OpenFreeMap Liberty dark-theme basemap ────────────────────────────
+    const MAP_STYLE_CONFIG = {
+      styleUrl:             'https://tiles.openfreemap.org/styles/liberty',
+      textColor:            '#ffffff',
+      mutedText:            '#cbd8e8',
+      haloColor:            '#334052',
+      roadMinor:            '#2c3036',
+      roadMajor:            '#2c3036',
+      roadCasing:           '#494e58',
+      highwayColor:         '#5a7299',
+      roadRail:             '#3c4561',
+      landColor:            '#424d5c',
+      parkColor:            '#283a32',
+      waterColor:           '#5f7481',
+      buildingColor:        '#38414e',
+      boundaryColor:        '#a3a0ab',
+      backgroundColor:      '#424d5c',
+      buildingOutlineColor: 'rgba(22,27,33,0.55)',
+      surfaceOutlineColor:  'rgba(255,255,255,0.05)',
+    };
+    function _bmClone(v) { return JSON.parse(JSON.stringify(v)); }
+    function _bmDarken(style) {
+      const s = _bmClone(style);
+      s.name = 'Watchtower Dark';
+      const LSIZES = {
+        'label_city':         ['interpolate', ['exponential', 1.2], ['zoom'], 4, 13, 7, 15, 11, 20],
+        'label_city_capital': ['interpolate', ['exponential', 1.2], ['zoom'], 4, 14, 7, 16, 11, 22],
+        'label_town':         ['interpolate', ['exponential', 1.2], ['zoom'], 7, 14, 11, 16],
+        'label_village':      ['interpolate', ['exponential', 1.2], ['zoom'], 7, 12, 11, 14],
+        'label_state':        ['interpolate', ['linear'], ['zoom'], 5, 12, 8, 16],
+        'label_country_1':    ['interpolate', ['linear'], ['zoom'], 1, 11, 4, 19],
+        'label_country_2':    ['interpolate', ['linear'], ['zoom'], 2, 11, 5, 19],
+        'label_country_3':    ['interpolate', ['linear'], ['zoom'], 3, 11, 7, 19],
+      };
+      s.layers = (s.layers || []).map(layer => {
+        const l = _bmClone(layer);
+        const id = String(l.id || '').toLowerCase();
+        const type = String(l.type || '').toLowerCase();
+        const paint = l.paint || {};
+        const layout = l.layout || {};
+        if (LSIZES[id] != null) layout['text-size'] = LSIZES[id];
+        if (type === 'background') paint['background-color'] = MAP_STYLE_CONFIG.backgroundColor;
+        if (type === 'fill') {
+          if (id.includes('water')) paint['fill-color'] = MAP_STYLE_CONFIG.waterColor;
+          else if (/(park|forest|wood|grass|golf|pitch|cemetery|green)/.test(id)) {
+            paint['fill-color'] = MAP_STYLE_CONFIG.parkColor;
+            paint['fill-opacity'] = ['interpolate', ['linear'], ['zoom'], 0, 0.22, 7, 0.3, 12, 0.36];
+          } else if (/(building|house)/.test(id)) paint['fill-color'] = MAP_STYLE_CONFIG.buildingColor;
+          else if (/(landuse|landcover|residential|industrial|commercial|aeroway)/.test(id)) paint['fill-color'] = MAP_STYLE_CONFIG.landColor;
+        }
+        if (type === 'fill-extrusion' && /(building|house)/.test(id)) {
+          paint['fill-extrusion-color'] = MAP_STYLE_CONFIG.buildingColor;
+          if (paint['fill-extrusion-base'] == null) paint['fill-extrusion-base'] = 0;
+        }
+        if (type === 'line') {
+          const isCasing = id.includes('casing') || id.includes('outline');
+          if (isCasing && MAP_STYLE_CONFIG.roadCasing) paint['line-color'] = MAP_STYLE_CONFIG.roadCasing;
+          else if (/(motorway|trunk|primary|major|highway)/.test(id)) paint['line-color'] = MAP_STYLE_CONFIG.roadMajor;
+          else if (/(rail|transit)/.test(id)) paint['line-color'] = MAP_STYLE_CONFIG.roadRail;
+          else if (/(water|river|stream)/.test(id)) paint['line-color'] = MAP_STYLE_CONFIG.waterColor;
+          else if (/(boundary|border)/.test(id)) paint['line-color'] = MAP_STYLE_CONFIG.boundaryColor;
+          else if (/(road|street|transport)/.test(id)) paint['line-color'] = MAP_STYLE_CONFIG.roadMinor;
+          const srcLayer = String(l['source-layer'] || '').toLowerCase();
+          if (id.includes('park_outline') || srcLayer === 'park') layout.visibility = 'none';
+        }
+        if (type === 'symbol') {
+          if (paint['text-color'] != null) paint['text-color'] = /(poi|housenumber|address|minor)/.test(id) ? MAP_STYLE_CONFIG.mutedText : MAP_STYLE_CONFIG.textColor;
+          if (paint['text-halo-color'] != null) paint['text-halo-color'] = MAP_STYLE_CONFIG.haloColor;
+          if (paint['icon-color'] != null) paint['icon-color'] = MAP_STYLE_CONFIG.mutedText;
+          if (/(poi|business|shop)/.test(id) && layout['text-size'] == null) layout['text-size'] = 11;
+        }
+        if (paint['fill-outline-color'] != null && /(building|landuse|park|water)/.test(id))
+          paint['fill-outline-color'] = /(building|house)/.test(id) ? MAP_STYLE_CONFIG.buildingOutlineColor : MAP_STYLE_CONFIG.surfaceOutlineColor;
+        if (paint['fill-extrusion-outline-color'] != null && /(building|house)/.test(id))
+          paint['fill-extrusion-outline-color'] = MAP_STYLE_CONFIG.buildingOutlineColor;
+        l.paint = paint; l.layout = layout;
+        return l;
+      });
+      return s;
+    }
+    function _bmRasterTuning(style) {
+      style.layers = (style.layers || []).map(layer => {
+        const l = _bmClone(layer);
+        if (String(l.type || '').toLowerCase() !== 'raster') return l;
+        const paint = l.paint || {};
+        paint['raster-saturation'] = -0.9; paint['raster-contrast'] = 0.18;
+        paint['raster-brightness-min'] = 0.04; paint['raster-brightness-max'] = 0.34;
+        if (String(l.id || '').toLowerCase().includes('natural_earth'))
+          paint['raster-opacity'] = ['interpolate', ['exponential', 1.5], ['zoom'], 0, 0.26, 6, 0.04];
+        l.paint = paint; return l;
+      });
+    }
+    function _bmHighwayColor(style) {
+      const hc = String(MAP_STYLE_CONFIG.highwayColor || '').trim();
+      if (!hc) return;
+      style.layers = (style.layers || []).map(layer => {
+        const l = _bmClone(layer);
+        const id = String(l.id || '').toLowerCase();
+        if (String(l.type || '').toLowerCase() !== 'line') return l;
+        if (String(l['source-layer'] || '').toLowerCase() !== 'transportation') return l;
+        const paint = l.paint || {};
+        if (paint['line-color'] == null || id.includes('casing') || id.includes('outline')) return l;
+        const orig = paint['line-color'];
+        paint['line-color'] = ['match', ['get', 'class'],
+          'motorway', hc, 'motorway_link', hc, 'trunk', hc, 'trunk_link', hc,
+          'primary', hc, 'primary_link', hc, orig];
+        l.paint = paint; return l;
+      });
+    }
+    function _bmSmallRoads(style) {
+      style.layers = (style.layers || []).map(layer => {
+        const l = _bmClone(layer);
+        if (String(l.type || '').toLowerCase() !== 'line') return l;
+        if (String(l['source-layer'] || '').toLowerCase() !== 'transportation') return l;
+        const paint = l.paint || {};
+        if (paint['line-color'] == null && paint['line-width'] == null) return l;
+        const id = String(l.id || '').toLowerCase();
+        const isCasing = id.includes('casing');
+        function hasClass(cs) {
+          const lcs = cs.map(c => String(c).toLowerCase());
+          if (lcs.some(c => id.includes(c))) return true;
+          const ft = JSON.stringify(l.filter || '').toLowerCase();
+          return lcs.some(c => ft.includes(`"${c}"`));
+        }
+        const isST = hasClass(['secondary', 'secondary_link', 'tertiary', 'tertiary_link']);
+        const isMinor = hasClass(['minor', 'residential', 'living_street', 'unclassified']) || id.includes('road_minor');
+        if (!isST && !isMinor) return l;
+        if (isST) {
+          if (typeof l.minzoom === 'number' && l.minzoom > 8) l.minzoom = 8;
+          paint['line-width'] = ['interpolate', ['exponential', 1.18], ['zoom'],
+            7.8, 0, 8.6, isCasing ? 0.34 : 0.24, 10, isCasing ? 0.82 : 0.58,
+            12, isCasing ? 1.4 : 1.06, 20, isCasing ? 14 : 13];
+          if (paint['line-opacity'] != null)
+            paint['line-opacity'] = ['interpolate', ['linear'], ['zoom'], 7.8, 0.3, 10, 0.74, 12, 0.9, 14, 1];
+        }
+        if (isMinor) {
+          if (typeof l.minzoom === 'number' && l.minzoom > 11) l.minzoom = 11;
+          paint['line-width'] = ['interpolate', ['exponential', 1.18], ['zoom'],
+            10.6, 0, 11.2, isCasing ? 0.24 : 0.16, 12.2, isCasing ? 0.42 : 0.3,
+            14, isCasing ? 2.8 : 2.5, 20, isCasing ? 19 : 18];
+          if (paint['line-opacity'] != null)
+            paint['line-opacity'] = ['interpolate', ['linear'], ['zoom'], 10.6, 0.32, 12.2, 0.62, 14, 0.92, 16, 1];
+        }
+        l.paint = paint; return l;
+      });
+    }
+    function _bmBoundaries(style) {
+      if (!style || !style.sources || !style.sources.openmaptiles) return;
+      const bc = String(MAP_STYLE_CONFIG.boundaryColor || '#a3a0ab').trim();
+      const layers = (style.layers || [])
+        .filter(l => { const id = String(l && l.id ? l.id : ''); return id !== 'paeoc-boundary-state' && id !== 'paeoc-boundary-county'; })
+        .map(layer => {
+          const l = _bmClone(layer); const id = String(l && l.id ? l.id : '');
+          if (id === 'boundary_2' || id === 'boundary_3' || id === 'boundary_disputed')
+            (l.layout = l.layout || {}).visibility = 'none';
+          return l;
+        });
+      const idx = layers.findIndex(l => { const id = String(l && l.id ? l.id : ''); return id.startsWith('boundary_') || id === 'boundary_disputed'; });
+      const at = idx >= 0 ? idx : layers.length;
+      const stateLayer = {
+        id: 'paeoc-boundary-state', type: 'line', source: 'openmaptiles', 'source-layer': 'boundary', minzoom: 0,
+        filter: ['all', ['==', ['get', 'admin_level'], 4], ['!=', ['get', 'maritime'], 1], ['!=', ['get', 'disputed'], 1], ['!', ['has', 'claimed_by']]],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': bc, 'line-opacity': 0.9, 'line-width': ['interpolate', ['linear'], ['zoom'], 0, 0.55, 3, 0.68, 6, 0.82, 10, 1.02, 14, 1.28, 18, 1.62] },
+      };
+      const countyLayer = {
+        id: 'paeoc-boundary-county', type: 'line', source: 'openmaptiles', 'source-layer': 'boundary', minzoom: 0,
+        filter: ['all', ['any', ['==', ['get', 'admin_level'], 2], ['==', ['get', 'admin_level'], 3], ['==', ['get', 'admin_level'], 4], ['==', ['get', 'admin_level'], 5], ['==', ['get', 'admin_level'], 6]], ['!=', ['get', 'maritime'], 1], ['!=', ['get', 'disputed'], 1], ['!', ['has', 'claimed_by']]],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': bc, 'line-opacity': 0.82, 'line-width': ['interpolate', ['linear'], ['zoom'], 0, 0.42, 3, 0.52, 6, 0.64, 10, 0.8, 14, 0.98, 18, 1.26] },
+      };
+      layers.splice(at, 0, countyLayer, stateLayer);
+      style.layers = layers;
+    }
+    async function resolveBasemapStyle() {
+      const res = await fetch(MAP_STYLE_CONFIG.styleUrl);
+      if (!res.ok) throw new Error(`Basemap fetch failed (${res.status})`);
+      const raw = await res.json();
+      const style = _bmDarken(raw);
+      _bmRasterTuning(style); _bmHighwayColor(style); _bmSmallRoads(style); _bmBoundaries(style);
+      return style;
+    }
 
-    const liveDotEl = document.createElement('div');
-    liveDotEl.className = 'live-dot';
-    const posMarker = new maplibregl.Marker({ element: liveDotEl, anchor: 'center' })
-      .setLngLat([-98.35, 39.5])
-      .addTo(map);
+    // ── Map ───────────────────────────────────────────────────────────────
+    let map, posMarker;
 
     // ── Shared state ──────────────────────────────────────────────────────
     let lastLat = null, lastLon = null, lastCrossingAt = null;
     let adsbLat = null, adsbLon = null, adsbReady = false;
 
-    // ── Map load: wire up all sources and layers ──────────────────────────
-    map.on('load', () => {
+    resolveBasemapStyle().then(style => {
+      map = new maplibregl.Map({
+        container: 'map',
+        style,
+        center: [-98.35, 39.5],
+        zoom: 11,
+        interactive: false,
+        attributionControl: false,
+      });
+
+      const liveDotEl = document.createElement('div');
+      liveDotEl.className = 'live-dot';
+      posMarker = new maplibregl.Marker({ element: liveDotEl, anchor: 'center' })
+        .setLngLat([-98.35, 39.5])
+        .addTo(map);
+
+      // ── Map load: wire up all sources and layers ──────────────────────────
+      map.on('load', () => {
 
       // Sources
       map.addSource(WX_SRC,    { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
@@ -417,6 +587,7 @@
         try { map.setPaintProperty(WX_MARCH, 'line-dasharray', WX_MARCH_FRAMES[wxMarchIdx]); } catch {}
       }, 50);
     });
+    }).catch(e => console.error('[basemap]', e));
 
     // ── RADAR ─────────────────────────────────────────────────────────────
     let radarFrames   = [];
@@ -822,7 +993,7 @@
       }
 
       // Map + ADS-B
-      if (d.lat && d.lon) {
+      if (d.lat && d.lon && map) {
         adsbLat = d.lat;
         adsbLon = d.lon;
 
