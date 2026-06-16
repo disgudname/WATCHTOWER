@@ -452,6 +452,7 @@
 
     // ── Map ───────────────────────────────────────────────────────────────
     let map, posMarker;
+    let wxHasFlash = false, wxHasMarch = false;
 
     // ── Shared state ──────────────────────────────────────────────────────
     let adsbLat = null, adsbLon = null, adsbReady = false;
@@ -636,16 +637,21 @@
       setInterval(refreshTfr,           300000);
       setInterval(refreshAdsb,           15000);
 
-      // Flash timer for tornado/severe warnings (excludes PDS/EMERGENCY/OBSERVED — those get marching ants)
+      // Flash timer — only fires setPaintProperty when there are flash-eligible warnings
       let wxFlashOn = false;
       setInterval(() => {
+        if (!wxHasFlash) {
+          if (wxFlashOn) { wxFlashOn = false; try { map.setPaintProperty(WX_FLASH, 'line-opacity', 0); } catch {} }
+          return;
+        }
         wxFlashOn = !wxFlashOn;
         try { map.setPaintProperty(WX_FLASH, 'line-opacity', wxFlashOn ? 0.92 : 0); } catch {}
       }, 800);
 
-      // Marching-ants timer: 14-frame cycle at 50ms/frame = 700ms full rotation
+      // Marching-ants timer — only runs when there are PDS/EMERGENCY/OBSERVED features
       let wxMarchIdx = 0;
       setInterval(() => {
+        if (!wxHasMarch) return;
         wxMarchIdx = (wxMarchIdx + 1) % WX_MARCH_FRAMES.length;
         try { map.setPaintProperty(WX_MARCH, 'line-dasharray', WX_MARCH_FRAMES[wxMarchIdx]); } catch {}
       }, 50);
@@ -770,6 +776,13 @@
         if (src) src.setData({ type: 'FeatureCollection', features });
         const motionSrc = map.getSource(WX_MOTION_SRC);
         if (motionSrc) motionSrc.setData(buildMotionFC(features));
+
+        wxHasFlash = features.some(f => f.properties._wxFlashBorder === 1);
+        wxHasMarch = features.some(f => {
+          const e = f.properties._wxEvent, i = f.properties._wxIntensity;
+          return (['TORNADO WARNING', 'FLASH FLOOD WARNING', 'SEVERE THUNDERSTORM WARNING'].includes(e) && ['EMERGENCY', 'PDS'].includes(i)) ||
+                 (e === 'TORNADO WARNING' && i === 'OBSERVED');
+        });
       } catch (e) {
         console.warn('[wx-alerts]', e);
       }

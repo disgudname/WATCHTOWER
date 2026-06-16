@@ -99,17 +99,21 @@ def db_save(ts, lat, lon, speed_mph, heading_deg, city_state):
     except Exception as e:
         log.error("DB write: %s", e)
 
-def db_load_route(limit=None):
+def db_load_route(limit=None, since=None):
     try:
+        where  = "WHERE timestamp >= ?" if since else ""
+        params = [since] if since else []
         with sqlite3.connect(DB_PATH) as conn:
             if limit:
                 rows = conn.execute(
-                    "SELECT lat,lon FROM positions ORDER BY timestamp DESC LIMIT ?", (limit,)
+                    f"SELECT lat,lon FROM positions {where} ORDER BY timestamp DESC LIMIT ?",
+                    params + [limit],
                 ).fetchall()
                 rows = list(reversed(rows))
             else:
                 rows = conn.execute(
-                    "SELECT lat,lon FROM positions ORDER BY timestamp"
+                    f"SELECT lat,lon FROM positions {where} ORDER BY timestamp",
+                    params,
                 ).fetchall()
         return [[round(r[0], 5), round(r[1], 5)] for r in rows]
     except Exception as e:
@@ -464,11 +468,13 @@ def pdm_art():
 @app.route("/api/status")
 def api_status():
     with _lock:
-        return jsonify(dict(_state))
+        s = dict(_state)
+    s.pop("route", None)
+    return jsonify(s)
 
 @app.route("/api/route")
 def api_route():
-    return jsonify({"route": db_load_route()})
+    return jsonify({"route": db_load_route(since=TRIP_START_DATE, limit=5000)})
 
 @app.route("/api/tips")
 def api_tips():

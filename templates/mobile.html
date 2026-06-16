@@ -361,6 +361,7 @@
     // ── State ────────────────────────────────────────────────────────────────
     let lastLat = null, lastLon = null;
     let lastCrossingAt = null;
+    let fullRoute = [], liveCoords = [], lastPt = null;
 
     function showStateBanner(name) {
       const el = document.getElementById('state-banner');
@@ -423,11 +424,31 @@
           map.panTo([d.lat, d.lon], { animate: true, duration: 1 });
           lastLat = d.lat; lastLon = d.lon;
         }
-        if (d.route && d.route.length > 0) {
-          routeLine.setLatLngs(d.route);
+        const pt = [d.lat, d.lon];
+        if (!lastPt || pt[0] !== lastPt[0] || pt[1] !== lastPt[1]) {
+          liveCoords.push(pt);
+          lastPt = pt;
+          routeLine.setLatLngs([...fullRoute, ...liveCoords]);
         }
       }
     }
+
+    // ── Route ────────────────────────────────────────────────────────────────
+    async function loadRoute() {
+      try {
+        const res = await fetch('/api/route');
+        if (!res.ok) return;
+        const d = await res.json();
+        fullRoute = d.route || [];
+        if (fullRoute.length) {
+          lastPt = fullRoute[fullRoute.length - 1];
+          routeLine.setLatLngs(fullRoute);
+        }
+      } catch (e) {
+        console.warn('[route]', e);
+      }
+    }
+    loadRoute();
 
     // ── Poll ─────────────────────────────────────────────────────────────────
     async function poll() {

@@ -31,7 +31,6 @@
       position: absolute;
       background: rgba(6, 8, 14, 0.78);
       border: 1px solid rgba(240, 165, 0, 0.22);
-      backdrop-filter: blur(8px);
     }
 
     #wx-icon { width: 52px; height: 52px; filter: brightness(1.1) saturate(0.9); }
@@ -382,10 +381,12 @@
 
     // ── Map ───────────────────────────────────────────────────────────────
     let map, posMarker;
+    let wxHasFlash = false, wxHasMarch = false;
 
     // ── Shared state ──────────────────────────────────────────────────────
     let lastLat = null, lastLon = null, lastCrossingAt = null;
     let adsbLat = null, adsbLon = null, adsbReady = false;
+    let fullRoute = [], liveCoords = [], lastPt = null;
 
     resolveBasemapStyle().then(style => {
       map = new maplibregl.Map({
@@ -573,19 +574,26 @@
       setInterval(refreshTfr,          300000);
       setInterval(refreshAdsb,          15000);
 
-      // Flash timer for tornado/severe warnings (excludes PDS/EMERGENCY/OBSERVED — those get marching ants)
+      // Flash timer — only fires setPaintProperty when there are flash-eligible warnings
       let wxFlashOn = false;
       setInterval(() => {
+        if (!wxHasFlash) {
+          if (wxFlashOn) { wxFlashOn = false; try { map.setPaintProperty(WX_FLASH, 'line-opacity', 0); } catch {} }
+          return;
+        }
         wxFlashOn = !wxFlashOn;
         try { map.setPaintProperty(WX_FLASH, 'line-opacity', wxFlashOn ? 0.92 : 0); } catch {}
       }, 800);
 
-      // Marching-ants timer: 14-frame cycle at 50ms/frame = 700ms full rotation
+      // Marching-ants timer — only runs when there are PDS/EMERGENCY/OBSERVED features
       let wxMarchIdx = 0;
       setInterval(() => {
+        if (!wxHasMarch) return;
         wxMarchIdx = (wxMarchIdx + 1) % WX_MARCH_FRAMES.length;
         try { map.setPaintProperty(WX_MARCH, 'line-dasharray', WX_MARCH_FRAMES[wxMarchIdx]); } catch {}
       }, 50);
+
+      loadRoute();
     });
     }).catch(e => console.error('[basemap]', e));
 
@@ -708,6 +716,13 @@
         if (src) src.setData({ type: 'FeatureCollection', features });
         const motionSrc = map.getSource(WX_MOTION_SRC);
         if (motionSrc) motionSrc.setData(buildMotionFC(features));
+
+        wxHasFlash = features.some(f => f.properties._wxFlashBorder === 1);
+        wxHasMarch = features.some(f => {
+          const e = f.properties._wxEvent, i = f.properties._wxIntensity;
+          return (['TORNADO WARNING', 'FLASH FLOOD WARNING', 'SEVERE THUNDERSTORM WARNING'].includes(e) && ['EMERGENCY', 'PDS'].includes(i)) ||
+                 (e === 'TORNADO WARNING' && i === 'OBSERVED');
+        });
       } catch (e) {
         console.warn('[wx-alerts]', e);
       }
@@ -1009,16 +1024,32 @@
           lastLat = d.lat; lastLon = d.lon;
         }
 
-        if (d.route && d.route.length > 0) {
+        const pt = [d.lon, d.lat];
+        if (!lastPt || pt[0] !== lastPt[0] || pt[1] !== lastPt[1]) {
+          liveCoords.push(pt);
+          lastPt = pt;
           const src = map.getSource(ROUTE_SRC);
           if (src) src.setData({
             type: 'Feature',
-            geometry: {
-              type: 'LineString',
-              coordinates: d.route.map(([lat, lon]) => [lon, lat]),
-            },
+            geometry: { type: 'LineString', coordinates: [...fullRoute, ...liveCoords] },
           });
         }
+      }
+    }
+
+    async function loadRoute() {
+      try {
+        const res = await fetch('/api/route');
+        if (!res.ok) return;
+        const d = await res.json();
+        fullRoute = (d.route || []).map(([lat, lon]) => [lon, lat]);
+        if (fullRoute.length) {
+          lastPt = fullRoute[fullRoute.length - 1];
+          const src = map.getSource(ROUTE_SRC);
+          if (src) src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: fullRoute } });
+        }
+      } catch (e) {
+        console.warn('[route]', e);
       }
     }
 
