@@ -59,8 +59,8 @@ $python = Join-Path $venvDir "Scripts\python.exe"
 
 # ── 3. Dependencies ───────────────────────────────────────────────────────────
 Write-Step "Installing Python dependencies..."
-& $pip install --quiet --upgrade pip
-& $pip install --quiet -r (Join-Path $Root "requirements.txt")
+& $pip install --upgrade pip
+& $pip install -r (Join-Path $Root "requirements.txt")
 Write-Ok "Dependencies installed"
 
 # ── 4. .env file ──────────────────────────────────────────────────────────────
