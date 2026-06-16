@@ -5,7 +5,7 @@
   <title>WATCHTOWER — OFF-GRID</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:ital,wght@0,300;0,400;0,600;0,700;0,800;1,300&display=swap">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -18,7 +18,6 @@
       color: #e8ecf4;
     }
 
-    /* subtle dot-grid texture */
     body::before {
       content: '';
       position: fixed;
@@ -31,277 +30,121 @@
 
     /* ── TOP BAR ────────────────────────────────────────────────── */
     #top-bar {
-      position: relative;
-      z-index: 1;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 56px;
-      height: 64px;
+      position: relative; z-index: 1;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 56px; height: 64px;
       border-bottom: 1px solid rgba(255,255,255,0.07);
     }
-    #top-left {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-    }
+    #top-left { display: flex; align-items: center; gap: 20px; }
     #wt-logo {
       font-family: 'Share Tech Mono', monospace;
-      font-size: 13px;
-      letter-spacing: 5px;
-      color: #fff;
-      text-transform: uppercase;
+      font-size: 13px; letter-spacing: 5px; color: #fff; text-transform: uppercase;
     }
-    #top-divider {
-      width: 1px;
-      height: 20px;
-      background: rgba(255,255,255,0.12);
-    }
+    #top-divider { width: 1px; height: 20px; background: rgba(255,255,255,0.12); }
     #trip-label {
-      font-size: 13px;
-      font-weight: 300;
-      letter-spacing: 5px;
-      color: #fff;
-      text-transform: uppercase;
+      font-size: 13px; font-weight: 300; letter-spacing: 5px;
+      color: #fff; text-transform: uppercase;
     }
-    #top-clock {
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 16px;
-      letter-spacing: 3px;
-      color: #fff;
-    }
+    #top-clock { font-family: 'Share Tech Mono', monospace; font-size: 16px; letter-spacing: 3px; color: #fff; }
 
     /* ── ACCENT LINE ─────────────────────────────────────────────── */
     #accent-line {
-      position: relative;
-      z-index: 1;
-      height: 2px;
+      position: relative; z-index: 1; height: 2px;
       background: linear-gradient(90deg,
-        transparent 0%,
-        rgba(77, 143, 255, 0.0) 10%,
-        rgba(77, 143, 255, 0.6) 40%,
-        rgba(77, 143, 255, 0.6) 60%,
-        rgba(77, 143, 255, 0.0) 90%,
-        transparent 100%
-      );
+        transparent 0%, rgba(77,143,255,0.0) 10%,
+        rgba(77,143,255,0.6) 40%, rgba(77,143,255,0.6) 60%,
+        rgba(77,143,255,0.0) 90%, transparent 100%);
     }
 
     /* ── HERO TEXT ───────────────────────────────────────────────── */
     #hero {
-      position: relative;
-      z-index: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+      position: relative; z-index: 1;
+      display: flex; flex-direction: column; align-items: center;
       padding: 38px 0 28px;
     }
     #hero-main {
-      font-size: 90px;
-      font-weight: 800;
-      letter-spacing: 18px;
-      text-transform: uppercase;
-      color: #ffffff;
-      line-height: 1;
+      font-size: 90px; font-weight: 800; letter-spacing: 18px;
+      text-transform: uppercase; color: #ffffff; line-height: 1;
       text-shadow: 0 0 60px rgba(77,143,255,0.18);
     }
     #hero-sub {
-      margin-top: 18px;
-      display: flex;
-      align-items: center;
-      gap: 18px;
-      font-size: 22px;
-      font-weight: 300;
-      letter-spacing: 4px;
-      color: #fff;
-      text-transform: uppercase;
+      margin-top: 18px; display: flex; align-items: center; gap: 18px;
+      font-size: 22px; font-weight: 300; letter-spacing: 4px;
+      color: #fff; text-transform: uppercase;
     }
-    #last-seen-loc {
-      color: #fff;
-      font-weight: 400;
-    }
-    .hero-dot {
-      width: 4px;
-      height: 4px;
-      border-radius: 50%;
-      background: rgba(77,143,255,0.55);
-      flex-shrink: 0;
-    }
-    #last-seen-age {
-      color: #4d8fff;
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 20px;
-      letter-spacing: 2px;
-    }
+    #last-seen-loc { color: #fff; font-weight: 400; }
+    .hero-dot { width: 4px; height: 4px; border-radius: 50%; background: rgba(77,143,255,0.55); flex-shrink: 0; }
+    #last-seen-age { color: #4d8fff; font-family: 'Share Tech Mono', monospace; font-size: 20px; letter-spacing: 2px; }
 
     /* ── MAP ─────────────────────────────────────────────────────── */
-    #map-section {
-      position: relative;
-      z-index: 1;
-      display: flex;
-      justify-content: center;
-      padding: 0 120px;
-    }
+    #map-section { position: relative; z-index: 1; display: flex; justify-content: center; padding: 0 120px; }
     #map-frame {
-      width: 100%;
-      height: 530px;
+      width: 100%; height: 530px;
       border: 1px solid rgba(77,143,255,0.14);
       outline: 4px solid rgba(77,143,255,0.04);
-      overflow: hidden;
-      position: relative;
+      overflow: hidden; position: relative;
     }
-    #map {
-      width: 100%;
-      height: 100%;
-    }
-    #map .leaflet-control-container,
-    #map .leaflet-attribution-flag { display: none !important; }
+    #map { width: 100%; height: 100%; }
+    #map .maplibregl-ctrl-top-left,
+    #map .maplibregl-ctrl-top-right,
+    #map .maplibregl-ctrl-bottom-left,
+    #map .maplibregl-ctrl-bottom-right { display: none !important; }
 
-    /* corner labels on map */
     #map-corner {
-      position: absolute;
-      top: 14px;
-      left: 18px;
-      z-index: 1000;
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 11px;
-      letter-spacing: 3px;
-      color: #fff;
-      text-transform: uppercase;
-      pointer-events: none;
+      position: absolute; top: 14px; left: 18px; z-index: 1000;
+      font-family: 'Share Tech Mono', monospace; font-size: 11px; letter-spacing: 3px;
+      color: #fff; text-transform: uppercase; pointer-events: none;
     }
 
     /* ── STATS ROW ───────────────────────────────────────────────── */
     #stats-row {
-      position: relative;
-      z-index: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0;
-      height: 146px;
+      position: relative; z-index: 1;
+      display: flex; align-items: center; justify-content: center;
+      gap: 0; height: 146px;
       border-top: 1px solid rgba(255,255,255,0.06);
       border-bottom: 1px solid rgba(255,255,255,0.06);
-      margin-top: 18px;
-      padding: 0 120px;
+      margin-top: 18px; padding: 0 120px;
     }
-    .stat-cell {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 24px;
-    }
-    .stat-cell + .stat-cell {
-      border-left: 1px solid rgba(255,255,255,0.08);
-    }
-    .stat-icon {
-      width: 78px;
-      height: 78px;
-      filter: brightness(0.8) saturate(0.7);
-    }
-    .stat-val {
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 52px;
-      color: #fff;
-      letter-spacing: 1px;
-    }
-    .stat-label {
-      font-size: 22px;
-      font-weight: 300;
-      letter-spacing: 4px;
-      color: #fff;
-      text-transform: uppercase;
-      margin-top: 3px;
-    }
-    #trip-day-val {
-      font-size: 52px;
-      font-weight: 700;
-      color: #fff;
-      line-height: 1;
-    }
-    #trip-day-of {
-      font-size: 22px;
-      font-weight: 300;
-      letter-spacing: 3px;
-      color: #fff;
-      margin-top: 2px;
-    }
+    .stat-cell { flex: 1; display: flex; align-items: center; justify-content: center; gap: 24px; }
+    .stat-cell + .stat-cell { border-left: 1px solid rgba(255,255,255,0.08); }
+    .stat-icon { width: 78px; height: 78px; filter: brightness(0.8) saturate(0.7); }
+    .stat-val { font-family: 'Share Tech Mono', monospace; font-size: 52px; color: #fff; letter-spacing: 1px; }
+    .stat-label { font-size: 22px; font-weight: 300; letter-spacing: 4px; color: #fff; text-transform: uppercase; margin-top: 3px; }
+    #trip-day-val { font-size: 52px; font-weight: 700; color: #fff; line-height: 1; }
+    #trip-day-of { font-size: 22px; font-weight: 300; letter-spacing: 3px; color: #fff; margin-top: 2px; }
 
     /* ── TIPS BAR ────────────────────────────────────────────────── */
     #tips-bar {
-      position: relative;
-      z-index: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 28px;
-      padding: 0 120px;
-      margin-top: 18px;
-      height: 72px;
+      position: relative; z-index: 1;
+      display: flex; align-items: center; justify-content: center;
+      gap: 28px; padding: 0 120px; margin-top: 18px; height: 72px;
       background: rgba(77,143,255,0.07);
       border-top: 1px solid rgba(77,143,255,0.2);
       border-bottom: 1px solid rgba(77,143,255,0.2);
     }
     #tips-tag {
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 6px;
-      color: #fff;
-      text-transform: uppercase;
-      flex-shrink: 0;
-      background: #4d8fff;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 7px 10px 7px 16px;
-      height: 40px;
+      font-family: 'Share Tech Mono', monospace; font-size: 13px; font-weight: 700;
+      letter-spacing: 6px; color: #fff; text-transform: uppercase; flex-shrink: 0;
+      background: #4d8fff; display: inline-flex; align-items: center; justify-content: center;
+      padding: 7px 10px 7px 16px; height: 40px;
     }
     #tips-text {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 30px;
-      font-weight: 600;
-      font-style: italic;
-      letter-spacing: 1px;
-      color: #fff;
-      transition: opacity 0.7s ease;
+      font-family: 'Barlow Condensed', sans-serif; font-size: 30px; font-weight: 600;
+      font-style: italic; letter-spacing: 1px; color: #fff; transition: opacity 0.7s ease;
     }
 
     /* ── FOOTER ──────────────────────────────────────────────────── */
     #footer {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 40px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1;
+      position: absolute; bottom: 0; left: 0; right: 0; height: 40px;
+      display: flex; align-items: center; justify-content: center; z-index: 1;
     }
-    #footer-text {
-      font-size: 11px;
-      font-weight: 300;
-      letter-spacing: 6px;
-      color: #fff;
-      text-transform: uppercase;
-    }
+    #footer-text { font-size: 11px; font-weight: 300; letter-spacing: 6px; color: #fff; text-transform: uppercase; }
 
     /* pulsing position marker */
-    .pulse-wrap {
-      position: relative;
-      width: 18px;
-      height: 18px;
-    }
-    .pulse-core {
-      position: absolute;
-      inset: 3px;
-      border-radius: 50%;
-      background: #4d8fff;
-      border: 2px solid #fff;
-    }
+    .pulse-wrap { position: relative; width: 18px; height: 18px; }
+    .pulse-core { position: absolute; inset: 3px; border-radius: 50%; background: #4d8fff; border: 2px solid #fff; }
     .pulse-ring {
-      position: absolute;
-      inset: 0;
-      border-radius: 50%;
+      position: absolute; inset: 0; border-radius: 50%;
       border: 2px solid rgba(77,143,255,0.5);
       animation: ring-expand 2.2s ease-out infinite;
     }
@@ -313,7 +156,6 @@
 </head>
 <body>
 
-  <!-- Top bar -->
   <div id="top-bar">
     <div id="top-left">
       <span id="wt-logo">Watchtower</span>
@@ -325,7 +167,6 @@
 
   <div id="accent-line"></div>
 
-  <!-- Hero -->
   <div id="hero">
     <div id="hero-main"><span id="vehicle-name">Serenity</span> is off-grid</div>
     <div id="hero-sub">
@@ -337,7 +178,6 @@
     </div>
   </div>
 
-  <!-- Map -->
   <div id="map-section">
     <div id="map-frame">
       <div id="map"></div>
@@ -345,7 +185,6 @@
     </div>
   </div>
 
-  <!-- Stats -->
   <div id="stats-row">
     <div class="stat-cell">
       <img class="stat-icon" id="wx-icon" src="https://openweathermap.org/img/wn/01d@2x.png" alt="">
@@ -376,42 +215,430 @@
     </div>
   </div>
 
-  <!-- Tips -->
   <div id="tips-bar">
     <span id="tips-tag">Tip</span>
     <span id="tips-text"></span>
   </div>
 
-  <!-- Footer -->
   <div id="footer">
     <span id="footer-text">WATCHTOWER field relay · <span id="footer-trip"></span></span>
   </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="/static/adsb-markers.js"></script>
   <script>
-    // ── Map ────────────────────────────────────────────────────────────
-    const map = L.map('map', {
-      zoomControl: false, attributionControl: false,
-      dragging: false, touchZoom: false, scrollWheelZoom: false,
-      doubleClickZoom: false, boxZoom: false, keyboard: false,
-    }).setView([39.5, -98.35], 5);
+    // ── Layer / source ID constants ────────────────────────────────────────
+    const RADAR_SRC_PFX = 'eoc-weather-radar-source-';
+    const RADAR_LYR_PFX = 'eoc-weather-radar-frame-';
+    const WX_SRC        = 'eoc-weather-alerts';
+    const WX_FILL       = 'eoc-weather-alerts-fill';
+    const WX_HALO       = 'eoc-weather-alerts-halo';
+    const WX_LINE       = 'eoc-weather-alerts-line';
+    const WX_FLASH      = 'eoc-weather-alerts-flash';
+    const TFR_SRC       = 'eoc-aviation-tfr';
+    const TFR_FILL      = 'eoc-aviation-tfr-fill';
+    const TFR_HALO      = 'eoc-aviation-tfr-outline-halo';
+    const TFR_LINE      = 'eoc-aviation-tfr-outline';
+    const ROUTE_SRC     = 'wt-route';
+    const ROUTE_LYR     = 'wt-route-line';
+    const ADSB_SRC      = 'eoc-adsb-aircraft';
+    const ADSB_LYR      = 'eoc-adsb-aircraft-layer';
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 18, subdomains: 'abcd',
-    }).addTo(map);
-
-    const routeLine = L.polyline([], {
-      color: '#4d8fff', weight: 5, opacity: 0.85,
-    }).addTo(map);
-
-    const posIcon = L.divIcon({
-      className: '',
-      html: '<div class="pulse-wrap"><div class="pulse-ring"></div><div class="pulse-core"></div></div>',
-      iconSize: [18, 18], iconAnchor: [9, 9],
+    // ── Map ───────────────────────────────────────────────────────────────
+    const map = new maplibregl.Map({
+      container: 'map',
+      style: {
+        version: 8,
+        sources: {
+          carto: {
+            type: 'raster',
+            tiles: [
+              'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+              'https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+              'https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+              'https://d.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+            ],
+            tileSize: 256, maxzoom: 19,
+          },
+        },
+        layers: [{ id: 'carto', type: 'raster', source: 'carto' }],
+      },
+      center: [-98.35, 39.5],
+      zoom: 5,
+      interactive: false,
+      attributionControl: false,
     });
-    const posMarker = L.marker([39.5, -98.35], { icon: posIcon }).addTo(map);
 
-    // ── Helpers ────────────────────────────────────────────────────────
+    const pulseEl = document.createElement('div');
+    pulseEl.className = 'pulse-wrap';
+    pulseEl.innerHTML = '<div class="pulse-ring"></div><div class="pulse-core"></div>';
+    const posMarker = new maplibregl.Marker({ element: pulseEl, anchor: 'center' })
+      .setLngLat([-98.35, 39.5])
+      .addTo(map);
+
+    // ── Shared state ──────────────────────────────────────────────────────
+    let adsbLat = null, adsbLon = null, adsbReady = false;
+    let fullRoute = [];   // [lon, lat] pairs from /api/route
+    let liveCoords = [];  // appended from status polls
+    let lastPt = null;
+    let currentAge = null;
+
+    // ── Map load ──────────────────────────────────────────────────────────
+    map.on('load', () => {
+
+      map.addSource(WX_SRC,    { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addSource(TFR_SRC,   { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addSource(ROUTE_SRC, { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } } });
+      map.addSource(ADSB_SRC,  { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, promoteId: 'hex' });
+
+      // ── Weather alert layers ──
+      map.addLayer({
+        id: WX_FILL, type: 'fill', source: WX_SRC,
+        layout: { 'fill-sort-key': ['coalesce', ['get', '_wxSortKey'], 0] },
+        paint: {
+          'fill-color':   ['coalesce', ['get', '_fill'], '#60a5fa'],
+          'fill-opacity': ['coalesce', ['get', '_fillOp'], 0.12],
+        },
+      });
+      map.addLayer({
+        id: WX_HALO, type: 'line', source: WX_SRC,
+        layout: { 'line-cap': 'round', 'line-join': 'round', 'line-sort-key': ['coalesce', ['get', '_wxSortKey'], 0] },
+        paint: {
+          'line-color': ['coalesce', ['get', '_halo'], '#ffffff'],
+          'line-width': ['interpolate', ['linear'], ['zoom'],
+            5, ['*', ['coalesce', ['get', '_haloW'], 2.75], 0.5],
+            12, ['coalesce', ['get', '_haloW'], 2.75]],
+          'line-opacity': 0.92,
+        },
+      });
+      map.addLayer({
+        id: WX_LINE, type: 'line', source: WX_SRC,
+        layout: { 'line-cap': 'round', 'line-join': 'round', 'line-sort-key': ['coalesce', ['get', '_wxSortKey'], 0] },
+        paint: {
+          'line-color': ['coalesce', ['get', '_line'], '#60a5fa'],
+          'line-width': ['interpolate', ['linear'], ['zoom'],
+            5, ['*', ['coalesce', ['get', '_lineW'], 1.25], 0.5],
+            12, ['coalesce', ['get', '_lineW'], 1.25]],
+          'line-opacity': 0.95,
+        },
+      });
+      map.addLayer({
+        id: WX_FLASH, type: 'line', source: WX_SRC,
+        filter: ['in', ['get', '_wxEvent'], ['literal', ['TORNADO WARNING', 'SEVERE THUNDERSTORM WARNING']]],
+        layout: { 'line-cap': 'round', 'line-join': 'round', 'line-sort-key': ['coalesce', ['get', '_wxSortKey'], 0] },
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': ['interpolate', ['linear'], ['zoom'],
+            5, ['*', ['coalesce', ['get', '_lineW'], 2.1], 0.5],
+            12, ['coalesce', ['get', '_lineW'], 2.1]],
+          'line-opacity': 0,
+        },
+      });
+
+      // ── TFR layers ──
+      map.addLayer({
+        id: TFR_FILL, type: 'fill', source: TFR_SRC,
+        paint: { 'fill-color': ['coalesce', ['get', 'color'], '#dc2626'], 'fill-opacity': 0.18 },
+      });
+      map.addLayer({
+        id: TFR_HALO, type: 'line', source: TFR_SRC,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#ffffff', 'line-width': 4.5, 'line-opacity': 0.7 },
+      });
+      map.addLayer({
+        id: TFR_LINE, type: 'line', source: TFR_SRC,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': ['coalesce', ['get', 'color'], '#dc2626'], 'line-width': 2.2, 'line-opacity': 1 },
+      });
+
+      // ── Route ──
+      map.addLayer({
+        id: ROUTE_LYR, type: 'line', source: ROUTE_SRC,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#4d8fff', 'line-width': 5, 'line-opacity': 0.85 },
+      });
+
+      // ── ADS-B symbols ──
+      map.addLayer({
+        id: ADSB_LYR, type: 'symbol', source: ADSB_SRC,
+        layout: {
+          'icon-image':              ['get', 'icon'],
+          'icon-size':               ['get', 'scale'],
+          'icon-rotate':             ['get', 'track'],
+          'icon-rotation-alignment': 'map',
+          'icon-pitch-alignment':    'map',
+          'icon-allow-overlap':      true,
+          'icon-ignore-placement':   true,
+          'symbol-sort-key':         ['get', 'sort_key'],
+        },
+      });
+
+      // ── Start overlays ──
+      initRadar();
+      refreshWeatherAlerts();
+      refreshTfr();
+
+      setInterval(initRadar,            300000);
+      setInterval(refreshWeatherAlerts,  120000);
+      setInterval(refreshTfr,           300000);
+      setInterval(refreshAdsb,           15000);
+
+      let wxFlashOn = false;
+      setInterval(() => {
+        wxFlashOn = !wxFlashOn;
+        try { map.setPaintProperty(WX_FLASH, 'line-opacity', wxFlashOn ? 0.9 : 0); } catch {}
+      }, 800);
+
+      // ── Load full route from DB ──
+      loadRoute();
+    });
+
+    // ── RADAR ─────────────────────────────────────────────────────────────
+    let radarFrames   = [];
+    let radarKnownIds = new Set();
+    let radarFrameIdx = 0;
+    let radarTimer    = null;
+    const RADAR_OPACITY = 0.55;
+
+    async function initRadar() {
+      try {
+        const res = await fetch('/proxy/weather-radar');
+        const d   = await res.json();
+        if (!d.ok || !Array.isArray(d.frames) || !d.frames.length) return;
+
+        const newIds   = new Set(d.frames.map(f => String(f.id)));
+        const tileSize = Math.max(256, d.tile_size || 256);
+
+        for (const id of radarKnownIds) {
+          if (!newIds.has(id)) {
+            const lid = RADAR_LYR_PFX + id, sid = RADAR_SRC_PFX + id;
+            try { if (map.getLayer(lid)) map.removeLayer(lid); } catch {}
+            try { if (map.getSource(sid)) map.removeSource(sid); } catch {}
+          }
+        }
+
+        for (const frame of d.frames) {
+          const sid = RADAR_SRC_PFX + frame.id, lid = RADAR_LYR_PFX + frame.id;
+          if (!map.getSource(sid))
+            map.addSource(sid, { type: 'raster', tiles: [frame.tile_url], tileSize });
+          if (!map.getLayer(lid))
+            map.addLayer({
+              id: lid, type: 'raster', source: sid,
+              paint: { 'raster-opacity': 0, 'raster-fade-duration': 0, 'raster-resampling': 'linear' },
+            }, WX_FILL);
+        }
+
+        radarKnownIds = newIds;
+        radarFrames   = d.frames;
+
+        if (!radarTimer) {
+          radarFrameIdx = 0;
+          radarTimer = setInterval(stepRadarFrame, Math.max(200, d.frame_interval_ms || 300));
+        }
+      } catch (e) {
+        console.warn('[radar]', e);
+      }
+    }
+
+    function stepRadarFrame() {
+      if (!radarFrames.length) return;
+      const prev = radarFrames[radarFrameIdx % radarFrames.length];
+      try { if (map.getLayer(RADAR_LYR_PFX + prev.id)) map.setPaintProperty(RADAR_LYR_PFX + prev.id, 'raster-opacity', 0); } catch {}
+      radarFrameIdx = (radarFrameIdx + 1) % radarFrames.length;
+      const cur = radarFrames[radarFrameIdx];
+      try { if (map.getLayer(RADAR_LYR_PFX + cur.id)) map.setPaintProperty(RADAR_LYR_PFX + cur.id, 'raster-opacity', RADAR_OPACITY); } catch {}
+    }
+
+    // ── WEATHER ALERTS ────────────────────────────────────────────────────
+    async function refreshWeatherAlerts() {
+      try {
+        const res = await fetch('/proxy/weather-alerts');
+        const d   = await res.json();
+        if (!d.ok) return;
+        const features = (d.features || []).map(f => {
+          const s = (f.properties && f.properties.style) || {};
+          return {
+            ...f,
+            properties: {
+              ...f.properties,
+              _fill:      s.fillColor || s.color || '#60a5fa',
+              _fillOp:    s.fillOpacity    ?? 0.12,
+              _line:      s.outlineColor   || s.color || '#60a5fa',
+              _lineW:     s.outlineWeight  ?? s.weight ?? 1.25,
+              _halo:      s.outlineHaloColor || '#ffffff',
+              _haloW:     s.outlineHaloWeight ?? s.outlineWeight ?? 2.75,
+              _wxSortKey: -(f.properties.priority || 0),
+              _wxEvent:   String(f.properties.event || '').toUpperCase(),
+            },
+          };
+        });
+        const src = map.getSource(WX_SRC);
+        if (src) src.setData({ type: 'FeatureCollection', features });
+      } catch (e) {
+        console.warn('[wx-alerts]', e);
+      }
+    }
+
+    // ── TFRs ──────────────────────────────────────────────────────────────
+    async function refreshTfr() {
+      try {
+        const res = await fetch('/proxy/aviation');
+        const d   = await res.json();
+        if (!d.ok || !d.geojson) return;
+        const src = map.getSource(TFR_SRC);
+        if (src) src.setData(d.geojson);
+      } catch (e) {
+        console.warn('[tfr]', e);
+      }
+    }
+
+    // ── ADS-B ─────────────────────────────────────────────────────────────
+    const T90             = window.Tar1090Markers || null;
+    const ICON_BASE_SCALE = 1.2;
+    const ICON_PX_RATIO   = 2;
+    const FALLBACK_SHAPE  = {
+      w: 22, h: 22, viewBox: '-2.5 -2.5 22 22',
+      path: 'M 4.256,15.496 C 3.979,14.340 7.280,13.606 7.280,13.606 V 8.650 l -6,2 c -0.680,0 -1,-0.350 -1,-0.660 C 0.242,9.595 0.496,9.231 0.880,9.130 1.140,9 4.800,7 7.280,5.630 V 3 C 7.280,1.890 7.720,0.290 8.510,0.290 9.300,0.290 9.770,1.840 9.770,3 v 2.630 c 2.450,1.370 6.100,3.370 6.370,3.500 0.390,0.093 0.651,0.461 0.610,0.860 -0.050,0.310 -0.360,0.670 -1.050,0.670 l -5.930,-2 v 4.946 c 0,0 3.300,0.734 3.024,1.890 -0.331,1.384 -2.830,0.378 -4.254,0.378 -1.434,4.520e-4 -3.950,1.016 -4.284,-0.378 z',
+    };
+
+    const _adsbIcons     = new Set();
+    let _iconRepushTimer = null;
+    const aircraftData   = {};
+
+    function altHsl(alt) {
+      if (!T90) return [0, 0, 53];
+      let a = (alt === 0 || alt === 'ground') ? 'ground'
+            : (typeof alt === 'number' ? alt : (() => { const p = parseInt(alt, 10); return isNaN(p) ? null : p; })());
+      const hsl = T90.altitudeColor(a);
+      if (a === 'ground') hsl[2] += 15;
+      return hsl;
+    }
+
+    function iconId(shape, hsl) {
+      return `adsb-${shape}-${Math.round(hsl[0]*10)/10}-${hsl[1]}-${Math.round(hsl[2]*10)/10}`;
+    }
+
+    function baseMarker(ac) {
+      if (!T90) return { shape: 'unknown', scale: 1 };
+      const alt = ac.alt_baro === 0 ? 'ground' : ac.alt_baro;
+      const bm  = T90.getBaseMarker(ac.category || null, ac.t || null, null, null, ac.type || null, alt);
+      return { shape: bm[0], scale: bm[1] || 1 };
+    }
+
+    function bakeIcon(id) {
+      const m = /^adsb-([a-z0-9_]+)-([\d.]+)-([\d.]+)-([\d.]+)$/.exec(id);
+      if (!m) return;
+      const fill  = `hsl(${m[2]},${m[3]}%,${m[4]}%)`;
+      const shape = (T90 && T90.shapes[m[1]]) || (m[1] === 'unknown' ? FALLBACK_SHAPE : null);
+      if (!shape) return;
+      let uri;
+      if (T90) {
+        uri = T90.svgShapeToURI(shape, fill, T90.outlineColor, T90.outlineWidth * 0.7 / ICON_BASE_SCALE, ICON_BASE_SCALE * ICON_PX_RATIO);
+      } else {
+        const w = shape.w * ICON_BASE_SCALE * ICON_PX_RATIO, h = shape.h * ICON_BASE_SCALE * ICON_PX_RATIO;
+        uri = 'data:image/svg+xml;base64,' + btoa(
+          `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${shape.viewBox}" width="${w}" height="${h}">` +
+          `<path paint-order="stroke" fill="${fill}" stroke="#000" stroke-width="0.6" d="${shape.path}"/></svg>`
+        );
+      }
+      const img = new Image();
+      img.onload = () => {
+        try {
+          if (!map.hasImage(id)) {
+            map.addImage(id, img, { pixelRatio: ICON_PX_RATIO });
+            if (!_iconRepushTimer)
+              _iconRepushTimer = setTimeout(() => { _iconRepushTimer = null; pushAircraft(); }, 120);
+          }
+        } catch {}
+      };
+      img.src = uri;
+    }
+
+    function ensureIcons(features) {
+      for (const f of features) {
+        const id = f.properties && f.properties.icon;
+        if (id && !_adsbIcons.has(id)) { _adsbIcons.add(id); bakeIcon(id); }
+      }
+    }
+
+    function buildAircraftFC() {
+      const features = [];
+      for (const hex of Object.keys(aircraftData)) {
+        const ac = aircraftData[hex];
+        if (!ac || ac.lat == null || ac.lon == null) continue;
+        const bm  = baseMarker(ac);
+        const hsl = altHsl(ac.alt_baro == null || ac.alt_baro === '' ? null : ac.alt_baro);
+        features.push({
+          type: 'Feature', id: hex,
+          geometry: { type: 'Point', coordinates: [ac.lon, ac.lat] },
+          properties: {
+            hex,
+            icon:     iconId(bm.shape, hsl),
+            scale:    bm.scale,
+            track:    (typeof ac.track === 'number' && !isNaN(ac.track)) ? ac.track : 0,
+            sort_key: -(typeof ac.alt_baro === 'number' ? ac.alt_baro : 0),
+          },
+        });
+      }
+      return { type: 'FeatureCollection', features };
+    }
+
+    function pushAircraft() {
+      const src = map.getSource(ADSB_SRC);
+      if (!src) return;
+      const fc = buildAircraftFC();
+      ensureIcons(fc.features);
+      try { src.setData(fc); } catch {}
+    }
+
+    async function refreshAdsb() {
+      if (adsbLat == null || adsbLon == null) return;
+      try {
+        const res = await fetch(`/proxy/adsb?lat=${adsbLat}&lon=${adsbLon}&dist=250`);
+        const d   = await res.json();
+        if (!d.ok) return;
+        const active = new Set();
+        for (const ac of d.aircraft || []) {
+          if (!ac.hex || ac.lat == null || ac.lon == null) continue;
+          active.add(ac.hex);
+          aircraftData[ac.hex] = ac;
+        }
+        for (const hex of Object.keys(aircraftData)) {
+          if (!active.has(hex)) delete aircraftData[hex];
+        }
+        pushAircraft();
+      } catch (e) {
+        console.warn('[adsb]', e);
+      }
+    }
+
+    // ── Route (full DB load + live append) ────────────────────────────────
+    function setRouteData(coords) {
+      const src = map.getSource(ROUTE_SRC);
+      if (src) src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: coords } });
+      document.getElementById('map-pts').textContent = coords.length;
+    }
+
+    async function loadRoute() {
+      try {
+        const res = await fetch('/api/route');
+        if (!res.ok) return;
+        const d = await res.json();
+        const raw = d.route || [];
+        fullRoute = raw.map(([lat, lon]) => [lon, lat]);
+        if (fullRoute.length > 0) {
+          lastPt = fullRoute[fullRoute.length - 1];
+          setRouteData(fullRoute);
+          const bounds = new maplibregl.LngLatBounds();
+          for (const c of fullRoute) bounds.extend(c);
+          map.fitBounds(bounds, { padding: 40, maxZoom: 12 });
+        }
+      } catch (e) {
+        console.warn('[route]', e);
+      }
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────
     function formatAge(s) {
       if (s === null || s === undefined) return '---';
       if (s < 60)    return 'just now';
@@ -421,8 +648,6 @@
       return d + (d === 1 ? ' day ago' : ' days ago');
     }
 
-    // ── Live age counter (ticks every second) ──────────────────────────
-    let currentAge = null;
     setInterval(() => {
       if (currentAge !== null) {
         currentAge++;
@@ -430,33 +655,21 @@
       }
     }, 1000);
 
-    // ── State ──────────────────────────────────────────────────────────
-    let mapFitted = false;
-    let fullRoute = [];
-    let liveTrail = [];
-    let lastPt    = null;
-
-    // ── Render ─────────────────────────────────────────────────────────
+    // ── Status poll ───────────────────────────────────────────────────────
     function render(d) {
-      // Vehicle name / trip name (config-driven)
-      document.getElementById('vehicle-name').textContent  = d.vehicle_name || 'Serenity';
-      document.getElementById('trip-label-label')
-        && (document.getElementById('trip-label-label').textContent = d.trip_name || '');
+      document.getElementById('vehicle-name').textContent = d.vehicle_name || 'Serenity';
       document.querySelectorAll('.trip-name-label').forEach(el => {
         el.textContent = d.trip_name || '2026 Reset Trip';
       });
       document.getElementById('footer-trip').textContent = d.trip_name || '2026 Reset Trip';
 
-      // Clock
       document.getElementById('top-clock').textContent =
         (d.local_time || '--:-- --') + ' · ' + (d.local_timezone || '---');
 
-      // Last seen
       document.getElementById('last-seen-loc').textContent = d.city_state || '---';
       currentAge = d.last_seen_seconds;
       document.getElementById('last-seen-age').textContent = formatAge(currentAge);
 
-      // Weather
       if (d.weather_temp_f !== null) {
         document.getElementById('wx-temp').textContent = d.weather_temp_f;
         document.getElementById('wx-desc').textContent = d.weather_desc || '---';
@@ -464,10 +677,8 @@
           'https://openweathermap.org/img/wn/' + (d.weather_icon || '01d') + '@2x.png';
       }
 
-      // Heading
       document.getElementById('wx-heading').textContent = d.heading || '---';
 
-      // Trip day
       if (d.trip_day !== null && d.trip_day !== undefined) {
         if (d.trip_day < 0) {
           const n = Math.abs(d.trip_day);
@@ -475,49 +686,34 @@
           document.getElementById('trip-day-of').textContent  = n === 1 ? '1 day to departure' : n + ' days to departure';
         } else {
           document.getElementById('trip-day-val').textContent = 'Day ' + d.trip_day;
-          document.getElementById('trip-day-of').textContent  =
-            d.trip_day + ' of ' + (d.trip_total || '?') + ' days';
+          document.getElementById('trip-day-of').textContent  = d.trip_day + ' of ' + (d.trip_total || '?') + ' days';
         }
       } else {
         document.getElementById('trip-day-val').textContent = '—';
         document.getElementById('trip-day-of').textContent  = d.trip_name || '';
       }
 
-      // Map — append new points; full route loaded separately via loadRoute()
       if (d.lat && d.lon) {
-        posMarker.setLatLng([d.lat, d.lon]);
-        const pt = [d.lat, d.lon];
+        adsbLat = d.lat;
+        adsbLon = d.lon;
+
+        if (!adsbReady && map.loaded()) {
+          adsbReady = true;
+          refreshAdsb();
+        }
+
+        posMarker.setLngLat([d.lon, d.lat]);
+
+        // Append any new point to the displayed route
+        const pt = [d.lon, d.lat];
         if (!lastPt || pt[0] !== lastPt[0] || pt[1] !== lastPt[1]) {
-          liveTrail.push(pt);
+          liveCoords.push(pt);
           lastPt = pt;
-          routeLine.setLatLngs([...fullRoute, ...liveTrail]);
-          document.getElementById('map-pts').textContent = fullRoute.length + liveTrail.length;
+          setRouteData([...fullRoute, ...liveCoords]);
         }
       }
     }
 
-    // ── Full route (loaded once on page open) ──────────────────────────
-    (async function loadRoute() {
-      try {
-        const r = await fetch('/api/route');
-        if (!r.ok) return;
-        const data = await r.json();
-        fullRoute = data.route || [];
-        if (fullRoute.length > 0) {
-          lastPt = fullRoute[fullRoute.length - 1];
-          routeLine.setLatLngs(fullRoute);
-          document.getElementById('map-pts').textContent = fullRoute.length;
-          try {
-            map.fitBounds(routeLine.getBounds(), { padding: [40, 40], maxZoom: 12 });
-            mapFitted = true;
-          } catch (e) {}
-        }
-      } catch (e) {
-        console.warn('route load error', e);
-      }
-    })();
-
-    // ── Poll ───────────────────────────────────────────────────────────
     async function poll() {
       try {
         const r = await fetch('/api/status');
@@ -530,15 +726,11 @@
 
     poll();
 
-    // ── Tips ───────────────────────────────────────────────────────────
+    // ── Tips ──────────────────────────────────────────────────────────────
     (async function initTips() {
       let tips = [];
-      try {
-        const r = await fetch('/api/tips');
-        if (r.ok) tips = await r.json();
-      } catch (e) { console.warn('tips fetch failed', e); }
+      try { const r = await fetch('/api/tips'); if (r.ok) tips = await r.json(); } catch {}
       if (!tips.length) return;
-
       for (let i = tips.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [tips[i], tips[j]] = [tips[j], tips[i]];
@@ -546,14 +738,9 @@
       let idx = 0;
       const el = document.getElementById('tips-text');
       el.textContent = tips[0];
-
       setInterval(() => {
         el.style.opacity = '0';
-        setTimeout(() => {
-          idx = (idx + 1) % tips.length;
-          el.textContent = tips[idx];
-          el.style.opacity = '1';
-        }, 700);
+        setTimeout(() => { idx = (idx + 1) % tips.length; el.textContent = tips[idx]; el.style.opacity = '1'; }, 700);
       }, 30000);
     })();
   </script>

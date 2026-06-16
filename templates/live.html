@@ -5,7 +5,7 @@
   <title>WATCHTOWER — LIVE</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700&display=swap">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -18,7 +18,6 @@
       color: #fff;
     }
 
-    /* vignette — darkens edges of the road footage underneath */
     body::before {
       content: '';
       position: fixed;
@@ -28,7 +27,6 @@
       z-index: 0;
     }
 
-    /* ── shared panel style ───────────────────────────────────── */
     .panel {
       position: absolute;
       background: rgba(6, 8, 14, 0.78);
@@ -36,202 +34,121 @@
       backdrop-filter: blur(8px);
     }
 
-    /* ── WEATHER (inline in loc-bar) ────────────────────────── */
-    #wx-icon {
-      width: 52px;
-      height: 52px;
-      filter: brightness(1.1) saturate(0.9);
-    }
+    #wx-icon { width: 52px; height: 52px; filter: brightness(1.1) saturate(0.9); }
     #wx-temp, #wx-desc {
       font-family: 'Share Tech Mono', monospace;
-      font-size: 34px;
-      font-weight: 400;
-      letter-spacing: 2px;
-      color: #fff;
-      text-transform: uppercase;
+      font-size: 34px; font-weight: 400; letter-spacing: 2px;
+      color: #fff; text-transform: uppercase;
     }
-    .loc-divider {
-      width: 1px;
-      height: 32px;
-      background: rgba(240,165,0,0.3);
-    }
+    .loc-divider { width: 1px; height: 32px; background: rgba(240,165,0,0.3); }
 
-    /* ── MINI MAP  bottom-right ──────────────────────────────── */
     #map-wrap {
-      bottom: 178px;
-      right: 44px;
-      width: 360px;
-      height: 270px;
+      bottom: 178px; right: 44px;
+      width: 360px; height: 270px;
       overflow: hidden;
     }
-    #map {
-      width: 100%;
-      height: 100%;
-    }
-    /* hide Leaflet chrome on small map */
-    #map .leaflet-control-container,
-    #map .leaflet-attribution-flag { display: none !important; }
+    #map { width: 100%; height: 100%; }
+    #map .maplibregl-ctrl-top-left,
+    #map .maplibregl-ctrl-top-right,
+    #map .maplibregl-ctrl-bottom-left,
+    #map .maplibregl-ctrl-bottom-right { display: none !important; }
 
-    /* ── LOCATION BAR  full-width bottom strip ────────────────── */
     #loc-bar {
       position: absolute;
-      bottom: 72px; left: 0; right: 0;
-      height: 90px;
+      bottom: 72px; left: 0; right: 0; height: 90px;
       background: rgba(6, 8, 14, 0.88);
       border-top: 1px solid rgba(240,165,0,0.18);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 28px;
+      display: flex; align-items: center; justify-content: center; gap: 28px;
       z-index: 10;
     }
-    #loc-val {
-      font-size: 36px;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-    }
+    #loc-val { font-size: 36px; letter-spacing: 3px; text-transform: uppercase; }
 
-    /* ── STALE / SIGNAL LOST badge  top-left ─────────────────── */
     #stale-badge {
-      bottom: 460px;
-      right: 44px;
+      bottom: 460px; right: 44px;
       padding: 9px 18px;
       background: rgba(180, 20, 20, 0.88);
       border: 1px solid rgba(220, 60, 60, 0.6);
       font-family: 'Barlow Condensed', sans-serif;
-      font-size: 17px;
-      font-weight: 600;
-      letter-spacing: 5px;
-      color: #fff;
-      text-transform: uppercase;
+      font-size: 17px; font-weight: 600; letter-spacing: 5px;
+      color: #fff; text-transform: uppercase;
       display: none;
       animation: stale-pulse 2.4s ease-in-out infinite;
     }
     #stale-badge.show { display: block; }
-
     @keyframes stale-pulse {
       0%, 100% { opacity: 1; }
       50%       { opacity: 0.45; }
     }
 
-    /* ── STATE CROSSING BANNER ───────────────────────────────── */
     #state-banner {
-      position: absolute;
-      top: 50%;
-      left: 50%;
+      position: absolute; top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      text-align: center;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 1s ease;
-      z-index: 20;
+      text-align: center; pointer-events: none;
+      opacity: 0; transition: opacity 1s ease; z-index: 20;
     }
     #state-banner.show { opacity: 1; }
     #state-banner-label {
       font-family: 'Barlow Condensed', sans-serif;
-      font-size: 22px;
-      font-weight: 300;
-      letter-spacing: 10px;
-      color: #fff;
-      text-transform: uppercase;
+      font-size: 22px; font-weight: 300; letter-spacing: 10px;
+      color: #fff; text-transform: uppercase;
     }
     #state-banner-name {
       font-family: 'Barlow Condensed', sans-serif;
-      font-size: 120px;
-      font-weight: 800;
-      letter-spacing: 16px;
-      color: #fff;
-      text-transform: uppercase;
-      line-height: 1;
+      font-size: 120px; font-weight: 800; letter-spacing: 16px;
+      color: #fff; text-transform: uppercase; line-height: 1;
       text-shadow: 0 0 80px rgba(240,165,0,0.35);
     }
 
-    /* ── TIPS BAR  full-width very bottom ───────────────────────── */
     #tips-bar {
       position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 72px;
+      bottom: 0; left: 0; right: 0; height: 72px;
       background: rgba(6, 8, 14, 0.92);
       border-top: 1px solid rgba(240,165,0,0.2);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 28px;
-      padding: 0 44px;
-      z-index: 10;
+      display: flex; align-items: center; justify-content: center;
+      gap: 28px; padding: 0 44px; z-index: 10;
     }
     #tips-tag {
       font-family: 'Share Tech Mono', monospace;
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 6px;
-      color: #fff;
-      text-transform: uppercase;
-      flex-shrink: 0;
+      font-size: 13px; font-weight: 700; letter-spacing: 6px;
+      color: #fff; text-transform: uppercase; flex-shrink: 0;
       background: #f0a500;
-      display: inline-flex;
-      align-items: center;
-      padding: 7px 10px 7px 16px;
-      height: 40px;
+      display: inline-flex; align-items: center;
+      padding: 7px 10px 7px 16px; height: 40px;
     }
     #tips-text {
       font-family: 'Barlow Condensed', sans-serif;
-      font-size: 30px;
-      font-weight: 600;
-      font-style: italic;
-      letter-spacing: 1px;
-      color: #fff;
-      transition: opacity 0.7s ease;
+      font-size: 30px; font-weight: 600; font-style: italic;
+      letter-spacing: 1px; color: #fff; transition: opacity 0.7s ease;
     }
 
-    /* ── HIGHWAY BADGE ──────────────────────────────────────── */
     #highway-badge {
       font-family: 'Barlow Condensed', sans-serif;
-      font-size: 28px;
-      font-weight: 700;
-      letter-spacing: 3px;
-      padding: 5px 14px;
-      border-radius: 4px;
-      text-transform: uppercase;
-      display: none;
+      font-size: 28px; font-weight: 700; letter-spacing: 3px;
+      padding: 5px 14px; border-radius: 4px;
+      text-transform: uppercase; display: none;
     }
     #highway-badge:not(:empty) { display: inline-block; }
-    #highway-badge.hw-interstate {
-      background: #003f87;
-      color: #fff;
-      border: 1px solid rgba(255,255,255,0.35);
-    }
-    #highway-badge.hw-us {
-      background: #f0a500;
-      color: #000;
-      border: 1px solid rgba(0,0,0,0.2);
-    }
+    #highway-badge.hw-interstate { background: #003f87; color: #fff; border: 1px solid rgba(255,255,255,0.35); }
+    #highway-badge.hw-us         { background: #f0a500; color: #000; border: 1px solid rgba(0,0,0,0.2); }
 
-    /* custom position marker */
     .live-dot {
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      background: #f0a500;
-      border: 3px solid #fff;
+      width: 22px; height: 22px; border-radius: 50%;
+      background: #f0a500; border: 3px solid #fff;
       box-shadow: 0 0 10px rgba(240,165,0,0.9);
     }
   </style>
 </head>
 <body>
 
-  <!-- State crossing banner -->
   <div id="state-banner">
     <div id="state-banner-label">Now entering</div>
     <div id="state-banner-name"></div>
   </div>
 
-  <!-- Mini map -->
   <div id="map-wrap" class="panel">
     <div id="map"></div>
   </div>
 
-  <!-- Location bar -->
   <div id="loc-bar">
     <img id="wx-icon" src="https://openweathermap.org/img/wn/01d@2x.png" alt="">
     <span id="wx-temp">---°F</span>
@@ -242,42 +159,413 @@
     <span id="wx-desc">---</span>
   </div>
 
-  <!-- Stale badge -->
   <div id="stale-badge" class="panel">&#9888; GPS SIGNAL LOST</div>
 
-  <!-- Tips -->
   <div id="tips-bar">
     <span id="tips-tag">Tip</span>
     <span id="tips-text"></span>
   </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="/static/adsb-markers.js"></script>
   <script>
-    // ── Map setup ──────────────────────────────────────────────────────
-    const map = L.map('map', {
-      zoomControl: false, attributionControl: false,
-      dragging: false, touchZoom: false, scrollWheelZoom: false,
-      doubleClickZoom: false, boxZoom: false, keyboard: false,
-    }).setView([39.5, -98.35], 11);
+    // ── Layer / source ID constants ────────────────────────────────────────
+    const RADAR_SRC_PFX = 'eoc-weather-radar-source-';
+    const RADAR_LYR_PFX = 'eoc-weather-radar-frame-';
+    const WX_SRC        = 'eoc-weather-alerts';
+    const WX_FILL       = 'eoc-weather-alerts-fill';
+    const WX_HALO       = 'eoc-weather-alerts-halo';
+    const WX_LINE       = 'eoc-weather-alerts-line';
+    const WX_FLASH      = 'eoc-weather-alerts-flash';
+    const TFR_SRC       = 'eoc-aviation-tfr';
+    const TFR_FILL      = 'eoc-aviation-tfr-fill';
+    const TFR_HALO      = 'eoc-aviation-tfr-outline-halo';
+    const TFR_LINE      = 'eoc-aviation-tfr-outline';
+    const ROUTE_SRC     = 'wt-route';
+    const ROUTE_LYR     = 'wt-route-line';
+    const ADSB_SRC      = 'eoc-adsb-aircraft';
+    const ADSB_LYR      = 'eoc-adsb-aircraft-layer';
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19, subdomains: 'abcd',
-    }).addTo(map);
-
-    const routeLine = L.polyline([], {
-      color: '#f0a500', weight: 2, opacity: 0.75,
-    }).addTo(map);
-
-    const posIcon = L.divIcon({
-      className: '', html: '<div class="live-dot"></div>',
-      iconSize: [22, 22], iconAnchor: [11, 11],
+    // ── Map ───────────────────────────────────────────────────────────────
+    const map = new maplibregl.Map({
+      container: 'map',
+      style: {
+        version: 8,
+        sources: {
+          carto: {
+            type: 'raster',
+            tiles: [
+              'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+              'https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+              'https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+              'https://d.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+            ],
+            tileSize: 256,
+            maxzoom: 19,
+          },
+        },
+        layers: [{ id: 'carto', type: 'raster', source: 'carto' }],
+      },
+      center: [-98.35, 39.5],
+      zoom: 11,
+      interactive: false,
+      attributionControl: false,
     });
-    const posMarker = L.marker([39.5, -98.35], { icon: posIcon }).addTo(map);
 
-    // ── State ──────────────────────────────────────────────────────────
-    let lastLat = null, lastLon = null;
-    let lastCrossingAt = null;
+    const liveDotEl = document.createElement('div');
+    liveDotEl.className = 'live-dot';
+    const posMarker = new maplibregl.Marker({ element: liveDotEl, anchor: 'center' })
+      .setLngLat([-98.35, 39.5])
+      .addTo(map);
 
+    // ── Shared state ──────────────────────────────────────────────────────
+    let lastLat = null, lastLon = null, lastCrossingAt = null;
+    let adsbLat = null, adsbLon = null, adsbReady = false;
+
+    // ── Map load: wire up all sources and layers ──────────────────────────
+    map.on('load', () => {
+
+      // Sources
+      map.addSource(WX_SRC,    { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addSource(TFR_SRC,   { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addSource(ROUTE_SRC, { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } } });
+      map.addSource(ADSB_SRC,  { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, promoteId: 'hex' });
+
+      // Radar frames are added dynamically inside initRadar(), always
+      // inserted before WX_FILL so they sit under alert polygons.
+
+      // ── Weather alert layers ──
+      map.addLayer({
+        id: WX_FILL, type: 'fill', source: WX_SRC,
+        layout: { 'fill-sort-key': ['coalesce', ['get', '_wxSortKey'], 0] },
+        paint: {
+          'fill-color':   ['coalesce', ['get', '_fill'], '#60a5fa'],
+          'fill-opacity': ['coalesce', ['get', '_fillOp'], 0.12],
+        },
+      });
+      map.addLayer({
+        id: WX_HALO, type: 'line', source: WX_SRC,
+        layout: { 'line-cap': 'round', 'line-join': 'round', 'line-sort-key': ['coalesce', ['get', '_wxSortKey'], 0] },
+        paint: {
+          'line-color': ['coalesce', ['get', '_halo'], '#ffffff'],
+          'line-width': ['interpolate', ['linear'], ['zoom'],
+            5, ['*', ['coalesce', ['get', '_haloW'], 2.75], 0.5],
+            12, ['coalesce', ['get', '_haloW'], 2.75]],
+          'line-opacity': 0.92,
+        },
+      });
+      map.addLayer({
+        id: WX_LINE, type: 'line', source: WX_SRC,
+        layout: { 'line-cap': 'round', 'line-join': 'round', 'line-sort-key': ['coalesce', ['get', '_wxSortKey'], 0] },
+        paint: {
+          'line-color': ['coalesce', ['get', '_line'], '#60a5fa'],
+          'line-width': ['interpolate', ['linear'], ['zoom'],
+            5, ['*', ['coalesce', ['get', '_lineW'], 1.25], 0.5],
+            12, ['coalesce', ['get', '_lineW'], 1.25]],
+          'line-opacity': 0.95,
+        },
+      });
+      // Flash layer pulses white for tornado/severe thunderstorm warnings
+      map.addLayer({
+        id: WX_FLASH, type: 'line', source: WX_SRC,
+        filter: ['in', ['get', '_wxEvent'], ['literal', ['TORNADO WARNING', 'SEVERE THUNDERSTORM WARNING']]],
+        layout: { 'line-cap': 'round', 'line-join': 'round', 'line-sort-key': ['coalesce', ['get', '_wxSortKey'], 0] },
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': ['interpolate', ['linear'], ['zoom'],
+            5, ['*', ['coalesce', ['get', '_lineW'], 2.1], 0.5],
+            12, ['coalesce', ['get', '_lineW'], 2.1]],
+          'line-opacity': 0,
+        },
+      });
+
+      // ── TFR layers ──
+      map.addLayer({
+        id: TFR_FILL, type: 'fill', source: TFR_SRC,
+        paint: {
+          'fill-color':   ['coalesce', ['get', 'color'], '#dc2626'],
+          'fill-opacity': 0.18,
+        },
+      });
+      map.addLayer({
+        id: TFR_HALO, type: 'line', source: TFR_SRC,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#ffffff', 'line-width': 4.5, 'line-opacity': 0.7 },
+      });
+      map.addLayer({
+        id: TFR_LINE, type: 'line', source: TFR_SRC,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color':   ['coalesce', ['get', 'color'], '#dc2626'],
+          'line-width':   2.2,
+          'line-opacity': 1,
+        },
+      });
+
+      // ── Route ──
+      map.addLayer({
+        id: ROUTE_LYR, type: 'line', source: ROUTE_SRC,
+        paint: { 'line-color': '#f0a500', 'line-width': 2, 'line-opacity': 0.75 },
+      });
+
+      // ── ADS-B symbols (topmost overlay layer) ──
+      map.addLayer({
+        id: ADSB_LYR, type: 'symbol', source: ADSB_SRC,
+        layout: {
+          'icon-image':                ['get', 'icon'],
+          'icon-size':                 ['get', 'scale'],
+          'icon-rotate':               ['get', 'track'],
+          'icon-rotation-alignment':   'map',
+          'icon-pitch-alignment':      'map',
+          'icon-allow-overlap':        true,
+          'icon-ignore-placement':     true,
+          'symbol-sort-key':           ['get', 'sort_key'],
+        },
+      });
+
+      // ── Start fetching ──
+      initRadar();
+      refreshWeatherAlerts();
+      refreshTfr();
+      // ADS-B starts after first GPS fix (see render())
+
+      setInterval(initRadar,           300000);
+      setInterval(refreshWeatherAlerts, 120000);
+      setInterval(refreshTfr,          300000);
+      setInterval(refreshAdsb,          15000);
+
+      // Flash timer for severe/tornado warnings
+      let wxFlashOn = false;
+      setInterval(() => {
+        wxFlashOn = !wxFlashOn;
+        try { map.setPaintProperty(WX_FLASH, 'line-opacity', wxFlashOn ? 0.9 : 0); } catch {}
+      }, 800);
+    });
+
+    // ── RADAR ─────────────────────────────────────────────────────────────
+    let radarFrames   = [];
+    let radarKnownIds = new Set();
+    let radarFrameIdx = 0;
+    let radarTimer    = null;
+    const RADAR_OPACITY = 0.55;
+
+    async function initRadar() {
+      try {
+        const res = await fetch('/proxy/weather-radar');
+        const d   = await res.json();
+        if (!d.ok || !Array.isArray(d.frames) || !d.frames.length) return;
+
+        const newIds   = new Set(d.frames.map(f => String(f.id)));
+        const tileSize = Math.max(256, d.tile_size || 256);
+
+        // Remove frames that have rolled off the server
+        for (const id of radarKnownIds) {
+          if (!newIds.has(id)) {
+            const lid = RADAR_LYR_PFX + id, sid = RADAR_SRC_PFX + id;
+            try { if (map.getLayer(lid)) map.removeLayer(lid); } catch {}
+            try { if (map.getSource(sid)) map.removeSource(sid); } catch {}
+          }
+        }
+
+        // Add any frames not yet on the map, inserting before alert fills
+        for (const frame of d.frames) {
+          const sid = RADAR_SRC_PFX + frame.id, lid = RADAR_LYR_PFX + frame.id;
+          if (!map.getSource(sid))
+            map.addSource(sid, { type: 'raster', tiles: [frame.tile_url], tileSize });
+          if (!map.getLayer(lid))
+            map.addLayer({
+              id: lid, type: 'raster', source: sid,
+              paint: { 'raster-opacity': 0, 'raster-fade-duration': 0, 'raster-resampling': 'linear' },
+            }, WX_FILL);
+        }
+
+        radarKnownIds = newIds;
+        radarFrames   = d.frames;
+
+        if (!radarTimer) {
+          radarFrameIdx = 0;
+          radarTimer = setInterval(stepRadarFrame, Math.max(200, d.frame_interval_ms || 300));
+        }
+      } catch (e) {
+        console.warn('[radar]', e);
+      }
+    }
+
+    function stepRadarFrame() {
+      if (!radarFrames.length) return;
+      const prev = radarFrames[radarFrameIdx % radarFrames.length];
+      try { if (map.getLayer(RADAR_LYR_PFX + prev.id)) map.setPaintProperty(RADAR_LYR_PFX + prev.id, 'raster-opacity', 0); } catch {}
+      radarFrameIdx = (radarFrameIdx + 1) % radarFrames.length;
+      const cur = radarFrames[radarFrameIdx];
+      try { if (map.getLayer(RADAR_LYR_PFX + cur.id)) map.setPaintProperty(RADAR_LYR_PFX + cur.id, 'raster-opacity', RADAR_OPACITY); } catch {}
+    }
+
+    // ── WEATHER ALERTS ────────────────────────────────────────────────────
+    async function refreshWeatherAlerts() {
+      try {
+        const res = await fetch('/proxy/weather-alerts');
+        const d   = await res.json();
+        if (!d.ok) return;
+
+        const features = (d.features || []).map(f => {
+          const s = (f.properties && f.properties.style) || {};
+          return {
+            ...f,
+            properties: {
+              ...f.properties,
+              _fill:       s.fillColor || s.color || '#60a5fa',
+              _fillOp:     s.fillOpacity    ?? 0.12,
+              _line:       s.outlineColor   || s.color || '#60a5fa',
+              _lineW:      s.outlineWeight  ?? s.weight ?? 1.25,
+              _halo:       s.outlineHaloColor || '#ffffff',
+              _haloW:      s.outlineHaloWeight ?? s.outlineWeight ?? 2.75,
+              _wxSortKey:  -(f.properties.priority || 0),
+              _wxEvent:    String(f.properties.event || '').toUpperCase(),
+            },
+          };
+        });
+
+        const src = map.getSource(WX_SRC);
+        if (src) src.setData({ type: 'FeatureCollection', features });
+      } catch (e) {
+        console.warn('[wx-alerts]', e);
+      }
+    }
+
+    // ── TFRs ──────────────────────────────────────────────────────────────
+    async function refreshTfr() {
+      try {
+        const res = await fetch('/proxy/aviation');
+        const d   = await res.json();
+        if (!d.ok || !d.geojson) return;
+        const src = map.getSource(TFR_SRC);
+        if (src) src.setData(d.geojson);
+      } catch (e) {
+        console.warn('[tfr]', e);
+      }
+    }
+
+    // ── ADS-B ─────────────────────────────────────────────────────────────
+    const T90             = window.Tar1090Markers || null;
+    const ICON_BASE_SCALE = 1.2;
+    const ICON_PX_RATIO   = 2;
+    const FALLBACK_SHAPE  = {
+      w: 22, h: 22, viewBox: '-2.5 -2.5 22 22',
+      path: 'M 4.256,15.496 C 3.979,14.340 7.280,13.606 7.280,13.606 V 8.650 l -6,2 c -0.680,0 -1,-0.350 -1,-0.660 C 0.242,9.595 0.496,9.231 0.880,9.130 1.140,9 4.800,7 7.280,5.630 V 3 C 7.280,1.890 7.720,0.290 8.510,0.290 9.300,0.290 9.770,1.840 9.770,3 v 2.630 c 2.450,1.370 6.100,3.370 6.370,3.500 0.390,0.093 0.651,0.461 0.610,0.860 -0.050,0.310 -0.360,0.670 -1.050,0.670 l -5.930,-2 v 4.946 c 0,0 3.300,0.734 3.024,1.890 -0.331,1.384 -2.830,0.378 -4.254,0.378 -1.434,4.520e-4 -3.950,1.016 -4.284,-0.378 z',
+    };
+
+    const _adsbIcons    = new Set();
+    let _iconRepushTimer = null;
+    const aircraftData  = {};
+
+    function altHsl(alt) {
+      if (!T90) return [0, 0, 53];
+      let a = (alt === 0 || alt === 'ground') ? 'ground'
+            : (typeof alt === 'number' ? alt : (() => { const p = parseInt(alt, 10); return isNaN(p) ? null : p; })());
+      const hsl = T90.altitudeColor(a);
+      if (a === 'ground') hsl[2] += 15;
+      return hsl;
+    }
+
+    function iconId(shape, hsl) {
+      return `adsb-${shape}-${Math.round(hsl[0]*10)/10}-${hsl[1]}-${Math.round(hsl[2]*10)/10}`;
+    }
+
+    function baseMarker(ac) {
+      if (!T90) return { shape: 'unknown', scale: 1 };
+      const alt = ac.alt_baro === 0 ? 'ground' : ac.alt_baro;
+      const bm  = T90.getBaseMarker(ac.category || null, ac.t || null, null, null, ac.type || null, alt);
+      return { shape: bm[0], scale: bm[1] || 1 };
+    }
+
+    function bakeIcon(id) {
+      const m = /^adsb-([a-z0-9_]+)-([\d.]+)-([\d.]+)-([\d.]+)$/.exec(id);
+      if (!m) return;
+      const fill  = `hsl(${m[2]},${m[3]}%,${m[4]}%)`;
+      const shape = (T90 && T90.shapes[m[1]]) || (m[1] === 'unknown' ? FALLBACK_SHAPE : null);
+      if (!shape) return;
+      let uri;
+      if (T90) {
+        uri = T90.svgShapeToURI(shape, fill, T90.outlineColor, T90.outlineWidth * 0.7 / ICON_BASE_SCALE, ICON_BASE_SCALE * ICON_PX_RATIO);
+      } else {
+        const w = shape.w * ICON_BASE_SCALE * ICON_PX_RATIO, h = shape.h * ICON_BASE_SCALE * ICON_PX_RATIO;
+        uri = 'data:image/svg+xml;base64,' + btoa(
+          `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${shape.viewBox}" width="${w}" height="${h}">` +
+          `<path paint-order="stroke" fill="${fill}" stroke="#000" stroke-width="0.6" d="${shape.path}"/></svg>`
+        );
+      }
+      const img = new Image();
+      img.onload = () => {
+        try {
+          if (!map.hasImage(id)) {
+            map.addImage(id, img, { pixelRatio: ICON_PX_RATIO });
+            if (!_iconRepushTimer)
+              _iconRepushTimer = setTimeout(() => { _iconRepushTimer = null; pushAircraft(); }, 120);
+          }
+        } catch {}
+      };
+      img.src = uri;
+    }
+
+    function ensureIcons(features) {
+      for (const f of features) {
+        const id = f.properties && f.properties.icon;
+        if (id && !_adsbIcons.has(id)) { _adsbIcons.add(id); bakeIcon(id); }
+      }
+    }
+
+    function buildAircraftFC() {
+      const features = [];
+      for (const hex of Object.keys(aircraftData)) {
+        const ac = aircraftData[hex];
+        if (!ac || ac.lat == null || ac.lon == null) continue;
+        const bm  = baseMarker(ac);
+        const hsl = altHsl(ac.alt_baro == null || ac.alt_baro === '' ? null : ac.alt_baro);
+        features.push({
+          type: 'Feature', id: hex,
+          geometry: { type: 'Point', coordinates: [ac.lon, ac.lat] },
+          properties: {
+            hex,
+            icon:     iconId(bm.shape, hsl),
+            scale:    bm.scale,
+            track:    (typeof ac.track === 'number' && !isNaN(ac.track)) ? ac.track : 0,
+            sort_key: -(typeof ac.alt_baro === 'number' ? ac.alt_baro : 0),
+          },
+        });
+      }
+      return { type: 'FeatureCollection', features };
+    }
+
+    function pushAircraft() {
+      const src = map.getSource(ADSB_SRC);
+      if (!src) return;
+      const fc = buildAircraftFC();
+      ensureIcons(fc.features);
+      try { src.setData(fc); } catch {}
+    }
+
+    async function refreshAdsb() {
+      if (adsbLat == null || adsbLon == null) return;
+      try {
+        const res = await fetch(`/proxy/adsb?lat=${adsbLat}&lon=${adsbLon}&dist=250`);
+        const d   = await res.json();
+        if (!d.ok) return;
+        const active = new Set();
+        for (const ac of d.aircraft || []) {
+          if (!ac.hex || ac.lat == null || ac.lon == null) continue;
+          active.add(ac.hex);
+          aircraftData[ac.hex] = ac;
+        }
+        for (const hex of Object.keys(aircraftData)) {
+          if (!active.has(hex)) delete aircraftData[hex];
+        }
+        pushAircraft();
+      } catch (e) {
+        console.warn('[adsb]', e);
+      }
+    }
+
+    // ── WATCHTOWER STATUS POLL ────────────────────────────────────────────
     function showStateBanner(name) {
       const el = document.getElementById('state-banner');
       document.getElementById('state-banner-name').textContent = name.toUpperCase();
@@ -285,10 +573,7 @@
       setTimeout(() => el.classList.remove('show'), 9000);
     }
 
-    // ── Render ─────────────────────────────────────────────────────────
     function render(d) {
-      const stale = d.stale;
-
       // Weather
       if (d.weather_temp_f !== null) {
         document.getElementById('wx-temp').textContent = d.weather_temp_f + '°F';
@@ -298,53 +583,63 @@
       }
 
       // Location
-      document.getElementById('loc-val').textContent =
-        (d.city_state || '---').toUpperCase();
+      document.getElementById('loc-val').textContent = (d.city_state || '---').toUpperCase();
 
       // Highway badge
       const hwBadge = document.getElementById('highway-badge');
       if (d.highway) {
         hwBadge.textContent = d.highway;
-        hwBadge.className = d.highway.startsWith('I-') ? 'hw-interstate' : 'hw-us';
+        hwBadge.className   = d.highway.startsWith('I-') ? 'hw-interstate' : 'hw-us';
         hwBadge.style.display = 'inline-block';
       } else {
         hwBadge.style.display = 'none';
       }
 
       // Stale badge
-      document.getElementById('stale-badge').classList.toggle('show', !!stale);
+      document.getElementById('stale-badge').classList.toggle('show', !!d.stale);
 
-      // State crossing banner
+      // State crossing
       const sc = d.state_crossing;
-      if (sc && sc.at && sc.at !== lastCrossingAt) {
-        const age = Date.now() / 1000 - sc.at;
-        if (age < 15) {
-          lastCrossingAt = sc.at;
-          showStateBanner(sc.name);
-        }
+      if (sc && sc.at && sc.at !== lastCrossingAt && (Date.now() / 1000 - sc.at) < 15) {
+        lastCrossingAt = sc.at;
+        showStateBanner(sc.name);
       }
 
-      // Map — only pan when position actually changes
+      // Map + ADS-B
       if (d.lat && d.lon) {
+        adsbLat = d.lat;
+        adsbLon = d.lon;
+
+        // Kick off first ADS-B poll as soon as we have GPS + map loaded
+        if (!adsbReady && map.loaded()) {
+          adsbReady = true;
+          refreshAdsb();
+        }
+
         if (d.lat !== lastLat || d.lon !== lastLon) {
-          posMarker.setLatLng([d.lat, d.lon]);
-          map.panTo([d.lat, d.lon], { animate: true, duration: 1 });
+          posMarker.setLngLat([d.lon, d.lat]);
+          map.easeTo({ center: [d.lon, d.lat], duration: 1000 });
           lastLat = d.lat; lastLon = d.lon;
         }
+
         if (d.route && d.route.length > 0) {
-          routeLine.setLatLngs(d.route);
+          const src = map.getSource(ROUTE_SRC);
+          if (src) src.setData({
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates: d.route.map(([lat, lon]) => [lon, lat]),
+            },
+          });
         }
       }
     }
 
-    // ── Poll ───────────────────────────────────────────────────────────
     async function poll() {
       try {
         const r = await fetch('/api/status');
         if (r.ok) render(await r.json());
-      } catch (e) {
-        console.warn('poll error', e);
-        // show stale if server unreachable
+      } catch {
         document.getElementById('stale-badge').classList.add('show');
       }
       setTimeout(poll, 5000);
@@ -352,15 +647,11 @@
 
     poll();
 
-    // ── Tips ───────────────────────────────────────────────────────────
+    // ── TIPS ──────────────────────────────────────────────────────────────
     (async function initTips() {
       let tips = [];
-      try {
-        const r = await fetch('/api/tips');
-        if (r.ok) tips = await r.json();
-      } catch (e) { console.warn('tips fetch failed', e); }
+      try { const r = await fetch('/api/tips'); if (r.ok) tips = await r.json(); } catch {}
       if (!tips.length) return;
-
       for (let i = tips.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [tips[i], tips[j]] = [tips[j], tips[i]];
@@ -368,14 +659,9 @@
       let idx = 0;
       const el = document.getElementById('tips-text');
       el.textContent = tips[0];
-
       setInterval(() => {
         el.style.opacity = '0';
-        setTimeout(() => {
-          idx = (idx + 1) % tips.length;
-          el.textContent = tips[idx];
-          el.style.opacity = '1';
-        }, 700);
+        setTimeout(() => { idx = (idx + 1) % tips.length; el.textContent = tips[idx]; el.style.opacity = '1'; }, 700);
       }, 30000);
     })();
   </script>

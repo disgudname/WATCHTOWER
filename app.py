@@ -9,7 +9,7 @@ from datetime import datetime, timezone, date
 from zoneinfo import ZoneInfo
 
 import requests
-from flask import Flask, jsonify, render_template, send_from_directory
+from flask import Flask, jsonify, render_template, send_from_directory, request
 from flask_cors import CORS
 from timezonefinder import TimezoneFinder
 from dotenv import load_dotenv
@@ -198,6 +198,7 @@ def trip_day_of():
 _geo_lat = _geo_lon = None
 _geo_result   = "---"
 _geo_highway  = None
+_geo_state_abbr = None
 _geo_last_req = 0.0
 
 _HW_RE = [
@@ -213,11 +214,11 @@ def parse_highway(road: str):
     return None
 
 def geocode(lat, lon):
-    global _geo_lat, _geo_lon, _geo_result, _geo_highway, _geo_last_req
+    global _geo_lat, _geo_lon, _geo_result, _geo_highway, _geo_state_abbr, _geo_last_req
     if _geo_lat is not None and haversine_mi(lat, lon, _geo_lat, _geo_lon) < 0.5:
-        return _geo_result, _geo_highway
+        return _geo_result, _geo_highway, _geo_state_abbr
     if time.time() - _geo_last_req < 1.0:
-        return _geo_result, _geo_highway
+        return _geo_result, _geo_highway, _geo_state_abbr
     try:
         r = _http.get(
             "https://nominatim.openstreetmap.org/reverse",
@@ -230,6 +231,7 @@ def geocode(lat, lon):
                  or addr.get("village") or addr.get("county", ""))
         state_full = addr.get("state", "")
         state = _STATE_ABBR.get(state_full, state_full[:2].upper() if state_full else "")
+        _geo_state_abbr = _STATE_ABBR.get(state_full) or ""
         _geo_result = f"{city}, {state}".strip(", ") or "Unknown"
         _geo_highway = parse_highway(addr.get("road", ""))
         _geo_lat, _geo_lon = lat, lon
@@ -237,7 +239,7 @@ def geocode(lat, lon):
         log.error("Geocode: %s", e)
     finally:
         _geo_last_req = time.time()
-    return _geo_result, _geo_highway
+    return _geo_result, _geo_highway, _geo_state_abbr
 
 # ── Weather ───────────────────────────────────────────────────────────────────
 _wx_temp = None
@@ -346,7 +348,7 @@ def _traccar_poll():
 
                 local_time, local_tz = local_time_at(lat, lon)
                 wx_temp, wx_desc, wx_icon = get_weather(lat, lon)
-                city_state, highway = geocode(lat, lon)
+                city_state, highway, state_abbr = geocode(lat, lon)
                 trip_day, trip_total = trip_day_of()
 
                 try:
@@ -363,7 +365,6 @@ def _traccar_poll():
                 _odo_last_lat, _odo_last_lon = lat, lon
 
                 # State crossing detection
-                state_abbr = city_state.split(", ")[-1] if ", " in city_state else ""
                 crossing = None
                 if state_abbr and _prev_state_abbr is not None and state_abbr != _prev_state_abbr:
                     crossing = {
@@ -402,6 +403,8 @@ def _traccar_poll():
                     }
                     if crossing:
                         updates["state_crossing"] = crossing
+                    elif _state.get("state_crossing") and time.time() - _state["state_crossing"]["at"] > 20:
+                        updates["state_crossing"] = None
                     _state.update(updates)
 
                 db_save(fix_time, lat, lon, speed_mph, pos.get("course"), city_state)
@@ -412,6 +415,46 @@ def _traccar_poll():
                 _state["stale"] = True
 
         time.sleep(5)
+
+# ── EOC Proxy ─────────────────────────────────────────────────────────────────
+_EOC = "https://eoc.pandemoniumair.com"
+
+@app.route("/proxy/adsb")
+def proxy_adsb():
+    try:
+        params = {k: request.args[k] for k in ("lat", "lon", "dist") if k in request.args}
+        r = _http.get(f"{_EOC}/api/sources/adsb/snapshot", params=params, timeout=8)
+        return r.content, r.status_code, {"Content-Type": "application/json"}
+    except Exception as e:
+        log.error("proxy/adsb: %s", e)
+        return jsonify({"ok": False, "aircraft": []}), 503
+
+@app.route("/proxy/aviation")
+def proxy_aviation():
+    try:
+        r = _http.get(f"{_EOC}/api/sources/aviation/snapshot", timeout=8)
+        return r.content, r.status_code, {"Content-Type": "application/json"}
+    except Exception as e:
+        log.error("proxy/aviation: %s", e)
+        return jsonify({"ok": False}), 503
+
+@app.route("/proxy/weather-alerts")
+def proxy_weather_alerts():
+    try:
+        r = _http.get(f"{_EOC}/api/weather-alerts", timeout=8)
+        return r.content, r.status_code, {"Content-Type": "application/json"}
+    except Exception as e:
+        log.error("proxy/weather-alerts: %s", e)
+        return jsonify({"ok": False, "features": []}), 503
+
+@app.route("/proxy/weather-radar")
+def proxy_weather_radar():
+    try:
+        r = _http.get(f"{_EOC}/api/weather-radar", timeout=8)
+        return r.content, r.status_code, {"Content-Type": "application/json"}
+    except Exception as e:
+        log.error("proxy/weather-radar: %s", e)
+        return jsonify({"ok": False, "frames": []}), 503
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 @app.route("/pdm.png")
