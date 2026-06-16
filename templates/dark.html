@@ -242,7 +242,18 @@
     const ROUTE_SRC     = 'wt-route';
     const ROUTE_LYR     = 'wt-route-line';
     const ADSB_SRC      = 'eoc-adsb-aircraft';
-    const ADSB_LYR      = 'eoc-adsb-aircraft-layer';
+    const ADSB_LYR       = 'eoc-adsb-aircraft-layer';
+    const WX_MARCH       = 'eoc-weather-alerts-emergency-march';
+    const WX_MOTION_SRC  = 'eoc-weather-motion';
+    const WX_MOTION_PATH = 'eoc-weather-motion-path';
+    const WX_MOTION_PT   = 'eoc-weather-motion-point';
+    const WX_MARCH_FRAMES = [
+      [4, 3], [0, 0.5, 4, 2.5], [0, 1, 4, 2], [0, 1.5, 4, 1.5],
+      [0, 2, 4, 1], [0, 2.5, 4, 0.5], [0, 3, 4], [0.5, 3, 3.5],
+      [1, 3, 3], [1.5, 3, 2.5], [2, 3, 2], [2.5, 3, 1.5],
+      [3, 3, 1], [3.5, 3, 0.5],
+    ];
+    const MOTION_FORECAST_MIN = 30;
 
     // ── Map ───────────────────────────────────────────────────────────────
     const map = new maplibregl.Map({
@@ -289,7 +300,8 @@
       map.addSource(WX_SRC,    { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       map.addSource(TFR_SRC,   { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       map.addSource(ROUTE_SRC, { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } } });
-      map.addSource(ADSB_SRC,  { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, promoteId: 'hex' });
+      map.addSource(ADSB_SRC,      { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, promoteId: 'hex' });
+      map.addSource(WX_MOTION_SRC, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
 
       // ── Weather alert layers ──
       map.addLayer({
@@ -324,7 +336,7 @@
       });
       map.addLayer({
         id: WX_FLASH, type: 'line', source: WX_SRC,
-        filter: ['in', ['get', '_wxEvent'], ['literal', ['TORNADO WARNING', 'SEVERE THUNDERSTORM WARNING']]],
+        filter: ['==', ['coalesce', ['get', '_wxFlashBorder'], 0], 1],
         layout: { 'line-cap': 'round', 'line-join': 'round', 'line-sort-key': ['coalesce', ['get', '_wxSortKey'], 0] },
         paint: {
           'line-color': '#ffffff',
@@ -332,6 +344,63 @@
             5, ['*', ['coalesce', ['get', '_lineW'], 2.1], 0.5],
             12, ['coalesce', ['get', '_lineW'], 2.1]],
           'line-opacity': 0,
+        },
+      });
+      // Marching-ants for PDS/EMERGENCY/OBSERVED tornado+severe warnings
+      map.addLayer({
+        id: WX_MARCH, type: 'line', source: WX_SRC,
+        filter: ['all',
+          ['any',
+            ['all',
+              ['any',
+                ['==', ['get', '_wxEvent'], 'TORNADO WARNING'],
+                ['==', ['get', '_wxEvent'], 'FLASH FLOOD WARNING'],
+                ['==', ['get', '_wxEvent'], 'SEVERE THUNDERSTORM WARNING'],
+              ],
+              ['any',
+                ['==', ['get', '_wxIntensity'], 'EMERGENCY'],
+                ['==', ['get', '_wxIntensity'], 'PDS'],
+              ],
+            ],
+            ['all',
+              ['==', ['get', '_wxEvent'], 'TORNADO WARNING'],
+              ['==', ['get', '_wxIntensity'], 'OBSERVED'],
+            ],
+          ],
+        ],
+        layout: { 'line-cap': 'butt', 'line-join': 'round', 'line-sort-key': ['coalesce', ['get', '_wxSortKey'], 0] },
+        paint: {
+          'line-color': ['coalesce', ['get', '_line'], '#ab47bc'],
+          'line-width': ['interpolate', ['linear'], ['zoom'],
+            5, ['*', ['coalesce', ['get', '_lineW'], 2.5], 0.75],
+            12, ['*', ['coalesce', ['get', '_lineW'], 2.5], 1.5]],
+          'line-opacity': 1,
+          'line-dasharray': WX_MARCH_FRAMES[0],
+        },
+      });
+      // Storm motion vectors
+      map.addLayer({
+        id: WX_MOTION_PATH, type: 'line', source: WX_MOTION_SRC,
+        minzoom: 6,
+        filter: ['==', ['get', '_role'], 'path'],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': ['coalesce', ['get', '_color'], '#ff0000'],
+          'line-width': ['interpolate', ['linear'], ['zoom'], 6, 1.2, 12, 2.2],
+          'line-opacity': 0.85,
+          'line-dasharray': [2, 2],
+        },
+      });
+      map.addLayer({
+        id: WX_MOTION_PT, type: 'circle', source: WX_MOTION_SRC,
+        minzoom: 6,
+        filter: ['==', ['get', '_role'], 'point'],
+        paint: {
+          'circle-color': ['coalesce', ['get', '_color'], '#ff0000'],
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 3, 12, 6],
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 1.5,
+          'circle-opacity': 0.95,
         },
       });
 
@@ -383,11 +452,19 @@
       setInterval(refreshTfr,           300000);
       setInterval(refreshAdsb,           15000);
 
+      // Flash timer for tornado/severe warnings (excludes PDS/EMERGENCY/OBSERVED — those get marching ants)
       let wxFlashOn = false;
       setInterval(() => {
         wxFlashOn = !wxFlashOn;
-        try { map.setPaintProperty(WX_FLASH, 'line-opacity', wxFlashOn ? 0.9 : 0); } catch {}
+        try { map.setPaintProperty(WX_FLASH, 'line-opacity', wxFlashOn ? 0.92 : 0); } catch {}
       }, 800);
+
+      // Marching-ants timer: 14-frame cycle at 50ms/frame = 700ms full rotation
+      let wxMarchIdx = 0;
+      setInterval(() => {
+        wxMarchIdx = (wxMarchIdx + 1) % WX_MARCH_FRAMES.length;
+        try { map.setPaintProperty(WX_MARCH, 'line-dasharray', WX_MARCH_FRAMES[wxMarchIdx]); } catch {}
+      }, 50);
 
       // ── Load full route from DB ──
       loadRoute();
@@ -450,6 +527,36 @@
     }
 
     // ── WEATHER ALERTS ────────────────────────────────────────────────────
+    function wxShouldFlash(f) {
+      const event = String(f.properties.event || '').toUpperCase();
+      const tier  = String(f.properties.intensity || '').toUpperCase();
+      if (['TORNADO WARNING', 'FLASH FLOOD WARNING', 'SEVERE THUNDERSTORM WARNING'].includes(event)
+          && (tier === 'EMERGENCY' || tier === 'PDS')) return false;
+      if (event === 'TORNADO WARNING' && tier === 'OBSERVED') return false;
+      return event === 'TORNADO WARNING' || event === 'SEVERE THUNDERSTORM WARNING';
+    }
+
+    function buildMotionFC(features) {
+      const mf = [];
+      for (const f of features) {
+        const p = f.properties || {};
+        const m = p.motion;
+        if (!m || m.lat == null || m.lon == null) continue;
+        const lat = Number(m.lat), lon = Number(m.lon);
+        const dir = Number(m.direction_deg), spd = Number(m.speed_kt);
+        if (!isFinite(lat) || !isFinite(lon) || !isFinite(dir) || !isFinite(spd)) continue;
+        const color = p._line || p._fill || '#ff0000';
+        const distNm = Math.max(0, spd) * (MOTION_FORECAST_MIN / 60);
+        const bearing = dir * Math.PI / 180;
+        const dLat = (distNm / 60) * Math.cos(bearing);
+        const cosLat = Math.cos(lat * Math.PI / 180);
+        const dLon = Math.abs(cosLat) > 1e-6 ? (distNm / 60) * Math.sin(bearing) / cosLat : 0;
+        mf.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: [[lon, lat], [lon + dLon, lat + dLat]] }, properties: { _role: 'path', _color: color } });
+        mf.push({ type: 'Feature', geometry: { type: 'Point', coordinates: [lon, lat] }, properties: { _role: 'point', _color: color } });
+      }
+      return { type: 'FeatureCollection', features: mf };
+    }
+
     async function refreshWeatherAlerts() {
       try {
         const res = await fetch('/proxy/weather-alerts');
@@ -461,19 +568,23 @@
             ...f,
             properties: {
               ...f.properties,
-              _fill:      s.fillColor || s.color || '#60a5fa',
-              _fillOp:    s.fillOpacity    ?? 0.12,
-              _line:      s.outlineColor   || s.color || '#60a5fa',
-              _lineW:     s.outlineWeight  ?? s.weight ?? 1.25,
-              _halo:      s.outlineHaloColor || '#ffffff',
-              _haloW:     s.outlineHaloWeight ?? s.outlineWeight ?? 2.75,
-              _wxSortKey: -(f.properties.priority || 0),
-              _wxEvent:   String(f.properties.event || '').toUpperCase(),
+              _fill:          s.fillColor || s.color || '#60a5fa',
+              _fillOp:        s.fillOpacity    ?? 0.12,
+              _line:          s.outlineColor   || s.color || '#60a5fa',
+              _lineW:         s.outlineWeight  ?? s.weight ?? 1.25,
+              _halo:          s.outlineHaloColor || '#ffffff',
+              _haloW:         s.outlineHaloWeight ?? s.outlineWeight ?? 2.75,
+              _wxSortKey:     -(f.properties.priority || 0),
+              _wxEvent:       String(f.properties.event || '').toUpperCase(),
+              _wxIntensity:   String(f.properties.intensity || '').toUpperCase(),
+              _wxFlashBorder: wxShouldFlash(f) ? 1 : 0,
             },
           };
         });
         const src = map.getSource(WX_SRC);
         if (src) src.setData({ type: 'FeatureCollection', features });
+        const motionSrc = map.getSource(WX_MOTION_SRC);
+        if (motionSrc) motionSrc.setData(buildMotionFC(features));
       } catch (e) {
         console.warn('[wx-alerts]', e);
       }
@@ -504,6 +615,107 @@
     const _adsbIcons     = new Set();
     let _iconRepushTimer = null;
     const aircraftData   = {};
+
+    // ── Dead reckoning (direct port of EOC adsb-overlay.js) ──────────────
+    const ANIM_ERR_BLEND_MS = 2000;
+    const ANIM_EXTRAP_MAX_S = 30;
+    const ANIM_ERR_SNAP_DEG = 0.02;
+    const animStates = {};
+
+    function _advancePosition(lat, lon, gsKt, trackDeg, dtS) {
+      const distDeg = (gsKt * dtS) / 3600 / 60;
+      const th = trackDeg * Math.PI / 180;
+      const cosLat = Math.cos(lat * Math.PI / 180);
+      return [
+        lat + distDeg * Math.cos(th),
+        lon + distDeg * Math.sin(th) / (Math.abs(cosLat) > 1e-6 ? cosLat : 1e-6),
+      ];
+    }
+
+    function _displayedCoords(hex, ac, nowMs) {
+      const st = animStates[hex];
+      if (!st) return [ac.lat, ac.lon];
+      let lat = st.refLat, lon = st.refLon;
+      if (st.gs > 1 && st.track != null) {
+        const dtS = Math.min(Math.max((nowMs - st.refTime) / 1000, 0), ANIM_EXTRAP_MAX_S);
+        const adv = _advancePosition(lat, lon, st.gs, st.track, dtS);
+        lat = adv[0]; lon = adv[1];
+      }
+      const f = 1 - (nowMs - st.errTime) / ANIM_ERR_BLEND_MS;
+      if (f > 0) { lat += st.errLat * f; lon += st.errLon * f; }
+      if (st.dispLat != null && st.gs > 1 && st.track != null) {
+        const th = st.track * Math.PI / 180;
+        const cosLat = Math.cos(lat * Math.PI / 180);
+        const cl = Math.abs(cosLat) > 1e-6 ? cosLat : 1e-6;
+        const along = (lat - st.dispLat) * Math.cos(th) + (lon - st.dispLon) * cl * Math.sin(th);
+        if (along < 0 && along > -ANIM_ERR_SNAP_DEG) {
+          lat -= along * Math.cos(th);
+          lon -= along * Math.sin(th) / cl;
+        }
+      }
+      st.dispLat = lat; st.dispLon = lon;
+      return [lat, lon];
+    }
+
+    function _updateAnimState(hex, ac, nowMs) {
+      const seenPos = typeof ac.seen_pos === 'number' ? ac.seen_pos : 0;
+      const refTime = nowMs - seenPos * 1000;
+      const gs    = (typeof ac.gs === 'number' && isFinite(ac.gs)) ? ac.gs : 0;
+      const track = (typeof ac.track === 'number' && !isNaN(ac.track)) ? ac.track : null;
+      const prev  = animStates[hex];
+      let errLat = 0, errLon = 0;
+      if (prev && prev.dispLat != null) {
+        let pLat = ac.lat, pLon = ac.lon;
+        if (gs > 1 && track != null) {
+          const dtS = Math.min(Math.max((nowMs - refTime) / 1000, 0), ANIM_EXTRAP_MAX_S);
+          const adv = _advancePosition(pLat, pLon, gs, track, dtS);
+          pLat = adv[0]; pLon = adv[1];
+        }
+        errLat = prev.dispLat - pLat;
+        errLon = prev.dispLon - pLon;
+        if (Math.abs(errLat) > ANIM_ERR_SNAP_DEG || Math.abs(errLon) > ANIM_ERR_SNAP_DEG) {
+          errLat = 0; errLon = 0;
+        }
+      }
+      animStates[hex] = {
+        refLat: ac.lat, refLon: ac.lon, refTime, gs, track,
+        errLat, errLon, errTime: nowMs,
+        dispLat: prev ? prev.dispLat : null,
+        dispLon: prev ? prev.dispLon : null,
+      };
+    }
+
+    function _animHasMotion(nowMs) {
+      for (const hex of Object.keys(animStates)) {
+        const st = animStates[hex];
+        if ((st.errLat || st.errLon) && nowMs - st.errTime < ANIM_ERR_BLEND_MS) return true;
+        if (st.gs > 1 && st.track != null && (nowMs - st.refTime) / 1000 < ANIM_EXTRAP_MAX_S) return true;
+      }
+      return false;
+    }
+
+    function _animFrameMs() {
+      let z = 10;
+      try { z = map.getZoom(); } catch (_) {}
+      return z >= 11 ? 100 : z >= 8 ? 250 : 600;
+    }
+
+    let _animRaf = null;
+    let _animLastPush = 0;
+    function _animTick() {
+      _animRaf = null;
+      if (!Object.keys(animStates).length) return;
+      const now = Date.now();
+      if (!_animHasMotion(now)) return;
+      if (now - _animLastPush >= _animFrameMs()) {
+        _animLastPush = now;
+        pushAircraft();
+      }
+      _animRaf = requestAnimationFrame(_animTick);
+    }
+    function startAnimLoop() {
+      if (_animRaf == null) _animRaf = requestAnimationFrame(_animTick);
+    }
 
     function altHsl(alt) {
       if (!T90) return [0, 0, 53];
@@ -563,14 +775,16 @@
 
     function buildAircraftFC() {
       const features = [];
+      const now = Date.now();
       for (const hex of Object.keys(aircraftData)) {
         const ac = aircraftData[hex];
         if (!ac || ac.lat == null || ac.lon == null) continue;
         const bm  = baseMarker(ac);
         const hsl = altHsl(ac.alt_baro == null || ac.alt_baro === '' ? null : ac.alt_baro);
+        const pos = _displayedCoords(hex, ac, now);
         features.push({
           type: 'Feature', id: hex,
-          geometry: { type: 'Point', coordinates: [ac.lon, ac.lat] },
+          geometry: { type: 'Point', coordinates: [pos[1], pos[0]] },
           properties: {
             hex,
             icon:     iconId(bm.shape, hsl),
@@ -598,15 +812,18 @@
         const d   = await res.json();
         if (!d.ok) return;
         const active = new Set();
+        const nowMs = Date.now();
         for (const ac of d.aircraft || []) {
           if (!ac.hex || ac.lat == null || ac.lon == null) continue;
           active.add(ac.hex);
           aircraftData[ac.hex] = ac;
+          _updateAnimState(ac.hex, ac, nowMs);
         }
         for (const hex of Object.keys(aircraftData)) {
-          if (!active.has(hex)) delete aircraftData[hex];
+          if (!active.has(hex)) { delete aircraftData[hex]; delete animStates[hex]; }
         }
         pushAircraft();
+        startAnimLoop();
       } catch (e) {
         console.warn('[adsb]', e);
       }
