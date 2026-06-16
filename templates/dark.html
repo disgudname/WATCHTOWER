@@ -224,19 +224,18 @@
     <span id="footer-text">WATCHTOWER field relay · <span id="footer-trip"></span></span>
   </div>
 
-  <audio id="bg-audio" autoplay loop style="display:none">
-    <source src="https://securestreams6.autopo.st:2202/onlocation" type="audio/mpeg">
-  </audio>
-
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <script src="/static/adsb-markers.js"></script>
   <script>
-    // Retry audio stream if it stalls (e.g. stream hiccup)
     (function () {
-      const audio = document.getElementById('bg-audio');
+      const audio = new Audio();
+      audio.preload = 'none';
+      audio.src = 'https://securestreams6.autopo.st:2202/onlocation';
       audio.volume = 1.0;
-      audio.addEventListener('error', () => setTimeout(() => { audio.load(); audio.play().catch(() => {}); }, 5000));
-      audio.addEventListener('stalled', () => setTimeout(() => { audio.load(); audio.play().catch(() => {}); }, 5000));
+      function tryPlay() { audio.play().catch(() => setTimeout(tryPlay, 3000)); }
+      audio.addEventListener('error', () => setTimeout(tryPlay, 5000));
+      audio.addEventListener('stalled', () => setTimeout(tryPlay, 5000));
+      tryPlay();
     })();
   </script>
   <script>
